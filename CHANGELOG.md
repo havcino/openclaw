@@ -12,6 +12,7 @@ Docs: https://docs.openclaw.ai
 
 ### Fixes
 
+- Agents/context engines: keep hidden OpenClaw runtime-context custom messages out of context-engine assemble, afterTurn, and ingest hooks so transcript reconstruction plugins only see conversation messages. Thanks @vincentkoc.
 - Plugins/externalization: add official npm-first catalogs for externalized channel, provider, and generic plugins, keep unpublished ACPX/Google Chat/LINE bundled, and make missing-plugin repair honor npm-first metadata while ClawHub pack files roll out. Thanks @vincentkoc.
 - CLI/infer: reject local `codex/*` one-shot model probes before simple-completion dispatch and point operators at the Codex app-server runtime path instead of ending with an empty-output error.
 - Agents/sessions: preserve terminal lifecycle state when final run metadata persists from a stale in-memory snapshot, preventing `main` sessions from staying stuck as running after completed or timed-out turns.
