@@ -113,13 +113,14 @@ export function createCodexDynamicToolBridge(params: {
           args,
           result: middlewareResult,
         });
+        const resultIsError = rawIsError || isToolResultError(result);
         collectToolTelemetry({
           toolName: tool.name,
           args,
           result,
           mediaTrustResult: rawResult,
           telemetry,
-          isError: rawIsError || isToolResultError(result),
+          isError: resultIsError,
         });
         void runAgentHarnessAfterToolCallHook({
           toolName: tool.name,
@@ -134,7 +135,7 @@ export function createCodexDynamicToolBridge(params: {
         });
         return {
           contentItems: result.content.flatMap(convertToolContent),
-          success: true,
+          success: !resultIsError,
         };
       } catch (error) {
         collectToolTelemetry({
