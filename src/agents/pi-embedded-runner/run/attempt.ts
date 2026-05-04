@@ -2822,9 +2822,6 @@ export async function runEmbeddedAttempt(
             pluginId: string;
             reason: string;
           }): Promise<boolean> => {
-            if (!blockedTranscriptPrompt.trim()) {
-              return false;
-            }
             try {
               const result = await appendBlockedUserMessageToSessionTranscript({
                 agentId: sessionAgentId,
@@ -2835,7 +2832,7 @@ export async function runEmbeddedAttempt(
                 reason: block.reason,
                 idempotencyKey: `hook-block:before_agent_run:user:${params.runId}`,
                 parentId: transcriptLeafId,
-                updateMode: "inline",
+                updateMode: "file-only",
               });
               if (!result.ok) {
                 log.warn(
