@@ -89,7 +89,7 @@ export function renderExecApprovalPrompt(state: AppViewState) {
     "deny",
   ];
   const handleCancel = () => {
-    if (!state.execApprovalBusy) {
+    if (!state.execApprovalBusy && allowedDecisions.includes("deny")) {
       void state.handleExecApprovalDecision("deny");
     }
   };

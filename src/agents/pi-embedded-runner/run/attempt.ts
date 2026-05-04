@@ -2689,25 +2689,6 @@ export async function runEmbeddedAttempt(
           });
         }
 
-        const googlePromptCacheStreamFn = await prepareGooglePromptCacheStreamFn({
-          apiKey: await resolveEmbeddedAgentApiKey({
-            provider: params.provider,
-            resolvedApiKey: params.resolvedApiKey,
-            authStorage: params.authStorage,
-          }),
-          extraParams: effectiveExtraParams,
-          model: params.model,
-          modelId: params.modelId,
-          provider: params.provider,
-          sessionManager,
-          signal: runAbortController.signal,
-          streamFn: activeSession.agent.streamFn,
-          systemPrompt: systemPromptText,
-        });
-        if (googlePromptCacheStreamFn) {
-          activeSession.agent.streamFn = googlePromptCacheStreamFn;
-        }
-
         const routingSummary = describeProviderRequestRoutingSummary({
           provider: params.provider,
           api: params.model.api,
@@ -2897,6 +2878,27 @@ export async function runEmbeddedAttempt(
               promptError = new Error(blockReplacementMsg);
               promptErrorSource = "hook:before_agent_run";
               skipPromptSubmission = true;
+            }
+          }
+
+          if (!skipPromptSubmission) {
+            const googlePromptCacheStreamFn = await prepareGooglePromptCacheStreamFn({
+              apiKey: await resolveEmbeddedAgentApiKey({
+                provider: params.provider,
+                resolvedApiKey: params.resolvedApiKey,
+                authStorage: params.authStorage,
+              }),
+              extraParams: effectiveExtraParams,
+              model: params.model,
+              modelId: params.modelId,
+              provider: params.provider,
+              sessionManager,
+              signal: runAbortController.signal,
+              streamFn: activeSession.agent.streamFn,
+              systemPrompt: systemPromptText,
+            });
+            if (googlePromptCacheStreamFn) {
+              activeSession.agent.streamFn = googlePromptCacheStreamFn;
             }
           }
 

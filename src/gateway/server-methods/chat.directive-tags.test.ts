@@ -634,6 +634,54 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     ).toBeUndefined();
   });
 
+  it("applies chat history text caps to blocked original content", async () => {
+    createTranscriptFixture("openclaw-chat-history-blocked-original-maxchars-");
+    fs.writeFileSync(
+      mockState.transcriptPath,
+      [
+        {
+          type: "session",
+          version: CURRENT_SESSION_VERSION,
+          id: mockState.sessionId,
+          timestamp: new Date(0).toISOString(),
+          cwd: "/tmp",
+        },
+        {
+          type: "message",
+          id: "blocked-1",
+          parentId: null,
+          message: {
+            role: "user",
+            content: [{ type: "text", text: "The agent cannot read this message." }],
+            timestamp: 1,
+          },
+          originalBlockedContent: {
+            content: [{ type: "text", text: "secret ".repeat(20) }],
+            blockedBy: "policy-plugin",
+            reason: "blocked by policy",
+            blockedAt: 1,
+          },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+      "utf-8",
+    );
+
+    const scoped = await runChatHistory({
+      client: createScopedCliClient(["operator.admin"]),
+      requestParams: { includeBlockedOriginalContent: true, maxChars: 24 },
+    });
+
+    expect(
+      (
+        scoped.messages?.[0] as {
+          __openclaw?: { originalBlockedContent?: { content?: Array<{ text?: string }> } };
+        }
+      )?.__openclaw?.originalBlockedContent?.content?.[0]?.text,
+    ).toBe("secret secret secret sec\n...(truncated)...");
+  });
+
   it("registers tool-event recipients for clients advertising tool-events capability", async () => {
     createTranscriptFixture("openclaw-chat-send-tool-events-");
     mockState.finalText = "ok";
