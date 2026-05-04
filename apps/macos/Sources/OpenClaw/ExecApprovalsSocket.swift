@@ -14,7 +14,7 @@ struct ExecApprovalPromptRequest: Codable {
     var agentId: String?
     var resolvedPath: String?
     var sessionKey: String?
-    var allowedDecisions: [ExecApprovalDecision]? = nil
+    var allowedDecisions: [ExecApprovalDecision]?
 }
 
 private struct ExecApprovalSocketRequest: Codable {
@@ -262,8 +262,7 @@ enum ExecApprovalsPromptPresenter {
     private static func renderedDecisions(_ request: ExecApprovalPromptRequest) -> [ExecApprovalDecision] {
         let defaults: [ExecApprovalDecision] = [.allowOnce, .allowAlways, .deny]
         let allowed = request.allowedDecisions ?? defaults
-        let decisions = defaults.filter { allowed.contains($0) }
-        return decisions
+        return defaults.filter { allowed.contains($0) }
     }
 
     private static func buttonTitle(_ decision: ExecApprovalDecision) -> String {

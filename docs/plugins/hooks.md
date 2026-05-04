@@ -243,7 +243,7 @@ to stop the run before the model can read the prompt. `reason` is internal;
 
 When a run is blocked, OpenClaw stores only the replacement in model-visible
 `message.content`. The human's original text is kept in blocked-content
-metadata for authorized write/admin history viewers so clients can show what
+metadata for authorized admin or transcript-secret history viewers so clients can show what
 the user typed with an "agent cannot read" notice.
 
 `before_agent_start` and `agent_end` include `event.runId` when OpenClaw can
