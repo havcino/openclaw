@@ -9,6 +9,7 @@ export type DispatchFromConfigResult = {
   queuedFinal: boolean;
   counts: Record<ReplyDispatchKind, number>;
   sourceReplyDeliveryMode?: SourceReplyDeliveryMode;
+  beforeAgentRunBlocked?: boolean;
 };
 
 export type DispatchFromConfigParams = {

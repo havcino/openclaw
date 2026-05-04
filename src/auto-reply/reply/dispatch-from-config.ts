@@ -1467,6 +1467,9 @@ export async function dispatchReplyFromConfig(
     }
 
     const replies = replyResult ? (Array.isArray(replyResult) ? replyResult : [replyResult]) : [];
+    const beforeAgentRunBlocked = replies.some(
+      (reply) => getReplyPayloadMetadata(reply)?.beforeAgentRunBlocked === true,
+    );
 
     let queuedFinal = false;
     let routedFinalCount = 0;
@@ -1550,7 +1553,7 @@ export async function dispatchReplyFromConfig(
       pluginFallbackReason ? { reason: pluginFallbackReason } : undefined,
     );
     markIdle("message_completed");
-    return attachSourceReplyDeliveryMode({ queuedFinal, counts });
+    return attachSourceReplyDeliveryMode({ queuedFinal, counts, beforeAgentRunBlocked });
   } catch (err) {
     if (inboundDedupeClaim.status === "claimed") {
       if (inboundDedupeReplayUnsafe) {

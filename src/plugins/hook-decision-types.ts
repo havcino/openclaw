@@ -59,16 +59,30 @@ export function isHookDecision(value: unknown): value is HookDecision {
     return false;
   }
   const v = value as Record<string, unknown>;
+  const keys = Object.keys(v);
   if (v.outcome === "pass") {
-    return true;
+    return keys.length === 1;
   }
   if (v.outcome !== "block") {
+    return false;
+  }
+  const allowedBlockKeys = new Set(["outcome", "reason", "message", "category", "metadata"]);
+  if (keys.some((key) => !allowedBlockKeys.has(key))) {
     return false;
   }
   if (typeof v.reason !== "string" || !v.reason.trim()) {
     return false;
   }
   if ("message" in v && (typeof v.message !== "string" || !v.message.trim())) {
+    return false;
+  }
+  if ("category" in v && (typeof v.category !== "string" || !v.category.trim())) {
+    return false;
+  }
+  if (
+    "metadata" in v &&
+    (typeof v.metadata !== "object" || v.metadata === null || Array.isArray(v.metadata))
+  ) {
     return false;
   }
   return true;
@@ -85,25 +99,4 @@ export type InputGateDecision = HookDecisionPass | HookDecisionBlock;
 export type GateHookResult<TDecision extends HookDecision = HookDecision> = {
   decision: TDecision;
   pluginId: string;
-};
-
-/**
- * Entry written to the per-session redaction audit log.
- * Contains hashes, not content (the redacted content is gone forever).
- */
-export type RedactionAuditEntry = {
-  /** Timestamp of the redaction. */
-  ts: number;
-  /** The hook point that triggered the redaction. */
-  hookPoint: string;
-  /** Which plugin requested the redaction. */
-  pluginId: string;
-  /** Internal reason for the redaction. */
-  reason: string;
-  /** Plugin-defined category. */
-  category?: string;
-  /** SHA-256 hash of the redacted content (not the content itself). */
-  contentHash?: string;
-  /** Number of messages removed from the transcript. */
-  messagesRemoved: number;
 };

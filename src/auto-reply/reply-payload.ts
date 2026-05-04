@@ -50,6 +50,7 @@ export type ReplyPayload = {
 
 export type ReplyPayloadMetadata = {
   assistantMessageIndex?: number;
+  beforeAgentRunBlocked?: boolean;
 };
 
 const replyPayloadMetadata = new WeakMap<object, ReplyPayloadMetadata>();

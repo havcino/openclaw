@@ -2265,6 +2265,7 @@ export const chatHandlers: GatewayRequestHandlers = {
       let appendedWebchatAgentMedia = false;
       let userTranscriptUpdatePromise: Promise<void> | null = null;
       let agentRunStarted = false;
+      let beforeAgentRunBlocked = false;
       const hasBeforeAgentRunGate = getGlobalHookRunner()?.hasHooks("before_agent_run") === true;
       const beforeAgentRunBlockIdempotencyKey = `hook-block:before_agent_run:user:${clientRunId}`;
       const hasPersistedBeforeAgentRunBlock = async () => {
@@ -2321,7 +2322,7 @@ export const chatHandlers: GatewayRequestHandlers = {
         await userTranscriptUpdatePromise;
       };
       const emitUserTranscriptUpdateUnlessBeforeAgentRunBlocked = async () => {
-        if (await hasPersistedBeforeAgentRunBlock()) {
+        if (beforeAgentRunBlocked || (await hasPersistedBeforeAgentRunBlock())) {
           return;
         }
         await emitUserTranscriptUpdate();
@@ -2492,7 +2493,8 @@ export const chatHandlers: GatewayRequestHandlers = {
           onModelSelected,
         },
       })
-        .then(async () => {
+        .then(async (dispatchResult) => {
+          beforeAgentRunBlocked = dispatchResult.beforeAgentRunBlocked === true;
           await rewriteUserTranscriptMedia();
           // WebChat persistence has two owners. Agent runs persist model-visible turns
           // through Pi's SessionManager; this dispatcher only owns live delivery payloads.

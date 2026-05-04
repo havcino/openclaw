@@ -22,10 +22,14 @@ describe("HookDecision helpers", () => {
       expect(isHookDecision({ block: true })).toBe(false);
       expect(isHookDecision({ outcome: "ask", reason: "check" })).toBe(false);
       expect(isHookDecision({ outcome: "invalid" })).toBe(false);
+      expect(isHookDecision({ outcome: "pass", message: "typo" })).toBe(false);
+      expect(isHookDecision({ outcome: "pass", reason: "typo" })).toBe(false);
       expect(isHookDecision({ outcome: "block" })).toBe(false);
       expect(isHookDecision({ outcome: "block", reason: "" })).toBe(false);
       expect(isHookDecision({ outcome: "block", reason: "policy", message: "" })).toBe(false);
       expect(isHookDecision({ outcome: "block", reason: "policy", message: 3 })).toBe(false);
+      expect(isHookDecision({ outcome: "block", reason: "policy", ask: true })).toBe(false);
+      expect(isHookDecision({ outcome: "block", reason: "policy", metadata: [] })).toBe(false);
     });
   });
 

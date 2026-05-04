@@ -2,7 +2,10 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeAll, describe, expect, test, vi } from "vitest";
-import { appendAssistantMessageToSessionTranscript } from "../config/sessions/transcript.js";
+import {
+  appendAssistantMessageToSessionTranscript,
+  appendBlockedUserMessageToSessionTranscript,
+} from "../config/sessions/transcript.js";
 import { emitSessionLifecycleEvent } from "../sessions/session-lifecycle-events.js";
 import * as transcriptEvents from "../sessions/transcript-events.js";
 import { emitSessionTranscriptUpdate } from "../sessions/transcript-events.js";
@@ -324,6 +327,46 @@ describe("session.message websocket events", () => {
       const payload = messageEvent.payload as {
         message?: { content?: unknown; __openclaw?: { originalBlockedContent?: unknown } };
       };
+      expect(payload.message?.content).toEqual([
+        { type: "text", text: "The agent cannot read this message." },
+      ]);
+      expect(payload.message?.__openclaw?.originalBlockedContent).toBeUndefined();
+    });
+  });
+
+  test("broadcasts redacted blocked user appends to live session listeners", async () => {
+    const storePath = await createSessionStoreFile();
+    await writeSessionStore({
+      entries: {
+        main: {
+          sessionId: "sess-main",
+          updatedAt: Date.now(),
+        },
+      },
+      storePath,
+    });
+
+    await withOperatorSessionSubscriber(async (ws) => {
+      const messageEventPromise = waitForSessionMessageEvent(ws, "agent:main:main");
+      const appended = await appendBlockedUserMessageToSessionTranscript({
+        sessionKey: "agent:main:main",
+        originalText: "secret blocked prompt",
+        redactedText: "The agent cannot read this message.",
+        pluginId: "policy-plugin",
+        reason: "contains protected content",
+        storePath,
+      });
+      expect(appended.ok).toBe(true);
+
+      const messageEvent = await messageEventPromise;
+      const payload = messageEvent.payload as {
+        message?: {
+          role?: unknown;
+          content?: unknown;
+          __openclaw?: { originalBlockedContent?: unknown };
+        };
+      };
+      expect(payload.message?.role).toBe("user");
       expect(payload.message?.content).toEqual([
         { type: "text", text: "The agent cannot read this message." },
       ]);

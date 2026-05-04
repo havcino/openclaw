@@ -72,6 +72,7 @@ const mockState = vi.hoisted(() => ({
   stageSandboxMediaError: null as Error | null,
   stagedRelativePaths: null as string[] | null,
   hasBeforeAgentRunHooks: false,
+  dispatchBlockedByBeforeAgentRun: false,
   // `unstagedSources` lets tests simulate partial staging failure: absolute
   // source paths listed here are excluded from the returned `staged` map even
   // though ctx still carries their rewritten paths. This mirrors how the real
@@ -201,7 +202,12 @@ vi.mock("../../auto-reply/dispatch.js", () => ({
       }
       params.dispatcher.markComplete();
       await params.dispatcher.waitForIdle();
-      return { ok: true };
+      return {
+        ok: true,
+        queuedFinal: true,
+        counts: { tool: 0, block: 0, final: 1 },
+        ...(mockState.dispatchBlockedByBeforeAgentRun ? { beforeAgentRunBlocked: true } : {}),
+      };
     },
   ),
 }));
@@ -561,6 +567,7 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
     mockState.unstagedSources = null;
     mockState.deleteMediaBufferCalls = [];
     mockState.hasBeforeAgentRunHooks = false;
+    mockState.dispatchBlockedByBeforeAgentRun = false;
   });
 
   it("includes blocked original content for scoped chat history callers", async () => {
@@ -2269,6 +2276,32 @@ describe("chat directive tag stripping for non-streaming final payloads", () => 
       respond,
       idempotencyKey: "idem-user-transcript-blocked-gate",
       message: "secret prompt that was blocked",
+      expectBroadcast: false,
+    });
+
+    const userUpdates = mockState.emittedTranscriptUpdates.filter(
+      (update) =>
+        typeof update.message === "object" &&
+        update.message !== null &&
+        (update.message as { role?: unknown }).role === "user",
+    );
+    expect(userUpdates).toHaveLength(0);
+  });
+
+  it("does not emit raw user transcript content when before_agent_run blocks without a persisted marker", async () => {
+    createTranscriptFixture("openclaw-chat-send-user-transcript-blocked-live-signal-");
+    mockState.finalText = "The agent cannot read this message.";
+    mockState.triggerAgentRunStart = true;
+    mockState.hasBeforeAgentRunHooks = true;
+    mockState.dispatchBlockedByBeforeAgentRun = true;
+    const respond = vi.fn();
+    const context = createChatContext();
+
+    await runNonStreamingChatSend({
+      context,
+      respond,
+      idempotencyKey: "idem-user-transcript-blocked-live-signal",
+      message: "secret prompt blocked before persistence",
       expectBroadcast: false,
     });
 

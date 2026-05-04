@@ -803,7 +803,7 @@ export type PluginHookBeforeInstallResult = {
 export type PluginHookBeforeAgentRunEvent = {
   /** The user's message that triggered this run. */
   prompt: string;
-  /** Full session messages loaded so far (for context-aware checks). */
+  /** Loaded session history before the current prompt is submitted. */
   messages: unknown[];
   /** Active system prompt prepared for this run. */
   systemPrompt?: string;

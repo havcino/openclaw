@@ -1685,6 +1685,7 @@ export async function runEmbeddedAttempt(
           await baseConvertToLlm(normalizeMessagesForLlmBoundary(messages));
       }
       let prePromptMessageCount = activeSession.messages.length;
+      let blockedBeforeAgentRunEndMessage: AgentMessage | undefined;
       let unwindowedContextEngineMessagesForPrecheck: AgentMessage[] | undefined;
       let contextEnginePromptAuthority: NonNullable<AssembleResult["promptAuthority"]> =
         "assembled";
@@ -2803,6 +2804,11 @@ export async function runEmbeddedAttempt(
             pluginId: string;
             reason: string;
           }): Promise<boolean> => {
+            blockedBeforeAgentRunEndMessage = {
+              role: "user",
+              content: block.message,
+              timestamp: Date.now(),
+            };
             try {
               const result = await appendBlockedUserMessageToSessionTranscript({
                 agentId: sessionAgentId,
@@ -2813,7 +2819,7 @@ export async function runEmbeddedAttempt(
                 reason: block.reason,
                 idempotencyKey: `hook-block:before_agent_run:user:${params.runId}`,
                 parentId: transcriptLeafId,
-                updateMode: "file-only",
+                updateMode: "inline",
               });
               if (!result.ok) {
                 log.warn(
@@ -3320,6 +3326,9 @@ export async function runEmbeddedAttempt(
           }
         }
         messagesSnapshot = snapshotSelection.messagesSnapshot;
+        if (blockedBeforeAgentRunEndMessage) {
+          messagesSnapshot = [...messagesSnapshot, blockedBeforeAgentRunEndMessage];
+        }
         sessionIdUsed = snapshotSelection.sessionIdUsed;
 
         lastAssistant = messagesSnapshot

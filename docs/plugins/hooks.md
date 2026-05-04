@@ -235,11 +235,11 @@ so your plugin does not depend on a legacy combined phase.
 
 `before_agent_run` runs after prompt construction and before any model input,
 including prompt-local image loading and `llm_input` observation. It receives
-the final prompt, the active system prompt, and the current session messages.
-Return `{ outcome: "block", reason, message? }` to stop the run before the
-model can read the prompt. `reason` is internal; `message` is the user-facing
-replacement. The only supported outcomes are `pass` and `block`; unsupported
-decision shapes fail closed.
+the current user input as `prompt`, plus loaded session history in `messages`
+and the active system prompt. Return `{ outcome: "block", reason, message? }`
+to stop the run before the model can read the prompt. `reason` is internal;
+`message` is the user-facing replacement. The only supported outcomes are
+`pass` and `block`; unsupported decision shapes fail closed.
 
 When a run is blocked, OpenClaw stores only the replacement in model-visible
 `message.content`. The human's original text is kept in blocked-content
