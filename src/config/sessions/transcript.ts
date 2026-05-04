@@ -19,7 +19,11 @@ import {
 import { resolveAndPersistSessionFile } from "./session-file.js";
 import { loadSessionStore, normalizeStoreSessionKey } from "./store.js";
 import { parseSessionThreadInfo } from "./thread-info.js";
-import { appendSessionTranscriptMessage } from "./transcript-append.js";
+import {
+  appendSessionTranscriptMessage,
+  type TranscriptRawAppendParentLink,
+  resolveTranscriptRawAppendParentLink,
+} from "./transcript-append.js";
 import { resolveMirroredTranscriptText } from "./transcript-mirror.js";
 import type { SessionEntry } from "./types.js";
 
@@ -74,37 +78,6 @@ async function ensureSessionHeader(params: {
     encoding: "utf-8",
     mode: 0o600,
   });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-async function readLatestTranscriptMessageId(sessionFile: string): Promise<string | null> {
-  if (!fs.existsSync(sessionFile)) {
-    return null;
-  }
-  const lines = (await fs.promises.readFile(sessionFile, "utf-8")).split(/\r?\n/);
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    const line = lines[index]?.trim();
-    if (!line) {
-      continue;
-    }
-    try {
-      const parsed: unknown = JSON.parse(line);
-      if (
-        isRecord(parsed) &&
-        parsed.type === "message" &&
-        typeof parsed.id === "string" &&
-        parsed.id.length > 0
-      ) {
-        return parsed.id;
-      }
-    } catch {
-      continue;
-    }
-  }
-  return null;
 }
 
 export type SessionTranscriptAppendResult =
@@ -445,16 +418,16 @@ export async function appendBlockedUserMessageToSessionTranscript(params: {
       // line. The JSONL format is stable: one JSON object per line.
       const messageId = `blocked-${crypto.randomUUID()}`;
       const nowMs = Date.now();
-      const parentId =
+      const parentLink: TranscriptRawAppendParentLink =
         params.parentId !== undefined
-          ? params.parentId
-          : await readLatestTranscriptMessageId(sessionFile);
+          ? { parentId: params.parentId }
+          : await resolveTranscriptRawAppendParentLink({ transcriptPath: sessionFile });
       const originalBlockedContent =
         params.originalText.length > 0 ? [{ type: "text", text: params.originalText }] : [];
       const jsonlEntry: Record<string, unknown> = {
         type: "message",
         id: messageId,
-        parentId,
+        ...parentLink,
         timestamp: new Date(nowMs).toISOString(),
         message: {
           role: "user",

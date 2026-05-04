@@ -277,6 +277,72 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     }
   });
 
+  it("migrates legacy linear transcripts before appending a blocked user message", async () => {
+    writeTranscriptStore();
+    const sessionFile = resolveSessionTranscriptPathInDir(sessionId, fixture.sessionsDir());
+    fs.writeFileSync(
+      sessionFile,
+      [
+        JSON.stringify({
+          type: "session",
+          version: 3,
+          id: sessionId,
+          timestamp: new Date().toISOString(),
+          cwd: process.cwd(),
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "legacy-first",
+          timestamp: new Date().toISOString(),
+          message: { role: "user", content: "legacy first" },
+        }),
+        JSON.stringify({
+          type: "message",
+          id: "legacy-second",
+          timestamp: new Date().toISOString(),
+          message: { role: "assistant", content: "legacy second" },
+        }),
+      ].join("\n") + "\n",
+      "utf-8",
+    );
+
+    const result = await appendBlockedUserMessageToSessionTranscript({
+      sessionKey,
+      originalText: "secret prompt",
+      redactedText: "Blocked by policy.",
+      pluginId: "policy-plugin",
+      reason: "contains protected content",
+      storePath: fixture.storePath(),
+      updateMode: "file-only",
+    });
+
+    expect(result.ok).toBe(true);
+    const messages = fs
+      .readFileSync(sessionFile, "utf-8")
+      .trim()
+      .split("\n")
+      .map(
+        (line) =>
+          JSON.parse(line) as {
+            type?: string;
+            id?: string;
+            parentId?: string | null;
+            message?: { content?: unknown };
+            originalBlockedContent?: { content?: Array<{ text?: string }> };
+          },
+      )
+      .filter((record) => record.type === "message");
+
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toMatchObject({ id: "legacy-first", parentId: null });
+    expect(messages[1]).toMatchObject({ id: "legacy-second", parentId: "legacy-first" });
+    expect(messages[2]).toMatchObject({
+      parentId: "legacy-second",
+      message: { content: [{ type: "text", text: "Blocked by policy." }] },
+    });
+    expect(messages[2]?.originalBlockedContent?.content?.[0]?.text).toBe("secret prompt");
+  });
+
   it("does not append a duplicate delivery mirror when the latest assistant message already matches", async () => {
     writeTranscriptStore();
 
