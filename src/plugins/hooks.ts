@@ -196,6 +196,7 @@ type ModifyingHookPolicy<K extends PluginHookName, TResult> = {
     next: TResult,
     registration: PluginHookRegistration<K>,
   ) => TResult;
+  mergeNullResults?: boolean;
   shouldStop?: (result: TResult) => boolean;
   terminalLabel?: string;
   onTerminal?: (params: { hookName: K; pluginId: string; result: TResult }) => void;
@@ -530,7 +531,9 @@ export function createHookRunner(
         const timeoutMs = getModifyingHookTimeoutMs(hookName, hook);
         const handlerResult = timeoutMs ? await withHookTimeout(promise, timeoutMs) : await promise;
 
-        if (handlerResult !== undefined && handlerResult !== null) {
+        const shouldMergeResult =
+          handlerResult !== undefined && (handlerResult !== null || policy.mergeNullResults);
+        if (shouldMergeResult) {
           if (policy.mergeResults) {
             result = policy.mergeResults(result, handlerResult, hook);
           } else {
@@ -1021,7 +1024,12 @@ export function createHookRunner(
       {
         mergeResults: (_acc, next, reg) => {
           if (next === undefined || next === null) {
-            return _acc;
+            const normalized: InputGateDecision = {
+              outcome: "block",
+              reason: "before_agent_run returned an invalid decision",
+            };
+            winningPluginId = reg.pluginId;
+            return normalized;
           }
           const normalized: InputGateDecision = isHookDecision(next)
             ? next
@@ -1038,6 +1046,7 @@ export function createHookRunner(
           }
           return merged;
         },
+        mergeNullResults: true,
         shouldStop: (result) => result?.outcome === "block",
         terminalLabel: "gate-decision",
       },

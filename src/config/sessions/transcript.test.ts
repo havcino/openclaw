@@ -219,7 +219,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     expect(messageLines[0]?.originalBlockedContent).toBeTruthy();
   });
 
-  it("emits blocked user inline updates with original content metadata for scoped history streams", async () => {
+  it("emits blocked user inline updates without original content metadata", async () => {
     writeTranscriptStore();
     const emitSpy = vi.spyOn(transcriptEvents, "emitSessionTranscriptUpdate");
 
@@ -244,14 +244,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
     );
     const payload = emitSpy.mock.calls[0]?.[0] as { message?: unknown } | undefined;
     const meta = (payload?.message as { __openclaw?: unknown } | undefined)?.__openclaw;
-    expect(meta).toEqual({
-      originalBlockedContent: {
-        content: [{ type: "text", text: "secret prompt" }],
-        blockedBy: "policy-plugin",
-        reason: "contains protected content",
-        blockedAt: expect.any(Number),
-      },
-    });
+    expect(meta).toBeUndefined();
     emitSpy.mockRestore();
   });
 

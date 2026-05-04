@@ -157,6 +157,26 @@ describe("before_agent_run hook", () => {
     });
   });
 
+  it("fails closed on null handler results", async () => {
+    const registry = makeRegistry([
+      {
+        pluginId: "null-plugin",
+        hookName: "before_agent_run",
+        handler: async () => null as never,
+        source: "test",
+      },
+    ]);
+    const runner = createHookRunner(registry);
+    const result = await runner.runBeforeAgentRun({ prompt: "test", messages: [] }, ctx);
+    expect(result).toEqual({
+      decision: {
+        outcome: "block",
+        reason: "before_agent_run returned an invalid decision",
+      },
+      pluginId: "null-plugin",
+    });
+  });
+
   it("fails closed on malformed block decisions", async () => {
     const registry = makeRegistry([
       {

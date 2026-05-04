@@ -1300,6 +1300,68 @@ describe("readSessionMessages", () => {
     ).toEqual([{ type: "text", text: "[hitl:block] hello" }]);
   });
 
+  test("keeps legacy linear history when a blocked hook append has an explicit parent", async () => {
+    const sessionId = "blocked-explicit-parent-legacy-session";
+    const sessionKey = "agent:main:explicit:blocked-explicit-parent-legacy";
+    const sessionFile = path.join(tmpDir, `${sessionId}.jsonl`);
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({
+        [sessionKey]: {
+          sessionId,
+          updatedAt: 1,
+          sessionFile,
+        },
+      }),
+      "utf-8",
+    );
+    fs.writeFileSync(
+      sessionFile,
+      [
+        { type: "session", version: 1, id: sessionId },
+        {
+          type: "message",
+          id: "legacy-first",
+          message: { role: "user", content: "legacy first", timestamp: 1 },
+        },
+        {
+          type: "message",
+          id: "legacy-second",
+          message: { role: "assistant", content: "legacy second", timestamp: 2 },
+        },
+      ]
+        .map((line) => JSON.stringify(line))
+        .join("\n") + "\n",
+      "utf-8",
+    );
+
+    const appendResult = await appendBlockedUserMessageToSessionTranscript({
+      sessionKey,
+      storePath,
+      originalText: "[hitl:block] legacy secret",
+      redactedText: "Blocked by HITL test hook.",
+      pluginId: "hitl-test-hooks",
+      reason: "blocked by test policy",
+      parentId: "legacy-second",
+      updateMode: "none",
+    });
+
+    expect(appendResult.ok).toBe(true);
+    const out = readSessionMessages(sessionId, storePath, sessionFile, {
+      includeBlockedOriginalContent: true,
+    });
+    expect(
+      out.map((message) => ({
+        role: (message as { role?: string }).role,
+        text: (message as { content?: string | Array<{ text?: string }> }).content,
+      })),
+    ).toEqual([
+      { role: "user", text: "legacy first" },
+      { role: "assistant", text: "legacy second" },
+      { role: "user", text: [{ type: "text", text: "Blocked by HITL test hook." }] },
+    ]);
+  });
+
   test("keeps repeated blocked hook messages together in a new session", async () => {
     const sessionId = "repeated-blocked-hook-session";
     const sessionKey = "agent:main:explicit:repeated-blocked-hook";

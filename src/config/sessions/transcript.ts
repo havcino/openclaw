@@ -418,10 +418,13 @@ export async function appendBlockedUserMessageToSessionTranscript(params: {
       // line. The JSONL format is stable: one JSON object per line.
       const messageId = `blocked-${crypto.randomUUID()}`;
       const nowMs = Date.now();
+      const resolvedParentLink = await resolveTranscriptRawAppendParentLink({
+        transcriptPath: sessionFile,
+      });
       const parentLink: TranscriptRawAppendParentLink =
-        params.parentId !== undefined
+        params.parentId !== undefined && "parentId" in resolvedParentLink
           ? { parentId: params.parentId }
-          : await resolveTranscriptRawAppendParentLink({ transcriptPath: sessionFile });
+          : resolvedParentLink;
       const originalBlockedContent =
         params.originalText.length > 0 ? [{ type: "text", text: params.originalText }] : [];
       const jsonlEntry: Record<string, unknown> = {
@@ -461,20 +464,14 @@ export async function appendBlockedUserMessageToSessionTranscript(params: {
   }
 
   switch (params.updateMode ?? "inline") {
-    case "inline": {
-      const messageWithBlockedOriginalContent = Object.assign({}, appendResult.jsonlEntry.message, {
-        __openclaw: {
-          originalBlockedContent: appendResult.jsonlEntry.originalBlockedContent,
-        },
-      });
+    case "inline":
       emitSessionTranscriptUpdate({
         sessionFile,
         sessionKey,
-        message: messageWithBlockedOriginalContent,
+        message: appendResult.jsonlEntry.message,
         messageId: appendResult.messageId,
       });
       break;
-    }
     case "file-only":
       emitSessionTranscriptUpdate(sessionFile);
       break;
