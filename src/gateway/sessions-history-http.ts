@@ -351,7 +351,7 @@ export async function handleSessionHistoryHttpRequest(
         closeStream();
         return;
       }
-      if (update.message !== undefined) {
+      if (update.message !== undefined && update.forceHistoryRefresh !== true) {
         if (limit === undefined && cursor === undefined) {
           const nextEvent = sseState.appendInlineMessage({
             message: update.message,

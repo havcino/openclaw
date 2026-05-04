@@ -470,6 +470,7 @@ export async function appendBlockedUserMessageToSessionTranscript(params: {
         sessionKey,
         message: appendResult.jsonlEntry.message,
         messageId: appendResult.messageId,
+        forceHistoryRefresh: true,
       });
       break;
     case "file-only":

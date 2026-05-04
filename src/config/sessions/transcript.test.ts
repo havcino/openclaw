@@ -240,6 +240,7 @@ describe("appendAssistantMessageToSessionTranscript", () => {
           role: "user",
           content: [{ type: "text", text: "Blocked by policy." }],
         }),
+        forceHistoryRefresh: true,
       }),
     );
     const payload = emitSpy.mock.calls[0]?.[0] as { message?: unknown } | undefined;

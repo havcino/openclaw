@@ -3,7 +3,12 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 let transcriptUpdateHandler:
-  | ((update: { sessionFile?: string; message?: unknown; messageId?: string }) => void)
+  | ((update: {
+      sessionFile?: string;
+      message?: unknown;
+      messageId?: string;
+      forceHistoryRefresh?: boolean;
+    }) => void)
   | undefined;
 let authRevoked = false;
 let gatewayConfig: {
@@ -115,7 +120,41 @@ vi.mock("./session-history-state.js", () => ({
         messageSeq: 1,
         messageId,
       }),
-      refreshAsync: async () => ({ items: [], nextCursor: null, messages: [] }),
+      refreshAsync: async () => ({
+        items: [
+          params.includeBlockedOriginalContent
+            ? {
+                role: "user",
+                content: [{ type: "text", text: "The agent cannot read this message." }],
+                __openclaw: {
+                  originalBlockedContent: {
+                    content: [{ type: "text", text: "secret blocked prompt" }],
+                  },
+                },
+              }
+            : {
+                role: "user",
+                content: [{ type: "text", text: "The agent cannot read this message." }],
+              },
+        ],
+        nextCursor: null,
+        messages: [
+          params.includeBlockedOriginalContent
+            ? {
+                role: "user",
+                content: [{ type: "text", text: "The agent cannot read this message." }],
+                __openclaw: {
+                  originalBlockedContent: {
+                    content: [{ type: "text", text: "secret blocked prompt" }],
+                  },
+                },
+              }
+            : {
+                role: "user",
+                content: [{ type: "text", text: "The agent cannot read this message." }],
+              },
+        ],
+      }),
     }),
   },
 }));
@@ -251,7 +290,7 @@ describe("session history SSE auth revocation", () => {
     expect(res.writableEnded).toBe(true);
   });
 
-  it("includes blocked originals on authorized live inline SSE updates", async () => {
+  it("refreshes authorized SSE history for redacted blocked update originals", async () => {
     currentScopes = ["operator.read", "operator.talk.secrets"];
     const req = new MockReq("/sessions/agent%3Amain/history?includeBlockedOriginalContent=true");
     const res = new MockRes();
@@ -270,19 +309,15 @@ describe("session history SSE auth revocation", () => {
       message: {
         role: "user",
         content: [{ type: "text", text: "The agent cannot read this message." }],
-        __openclaw: {
-          originalBlockedContent: {
-            content: [{ type: "text", text: "secret blocked prompt" }],
-          },
-        },
       },
       messageId: "blocked-1",
+      forceHistoryRefresh: true,
     });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     const joined = res.writes.join("");
-    expect(joined).toContain("event: message");
+    expect(joined).toContain("event: history");
     expect(joined).toContain("secret blocked prompt");
     expect(res.writableEnded).toBe(false);
   });
