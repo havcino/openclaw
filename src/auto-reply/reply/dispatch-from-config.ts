@@ -1553,7 +1553,11 @@ export async function dispatchReplyFromConfig(
       pluginFallbackReason ? { reason: pluginFallbackReason } : undefined,
     );
     markIdle("message_completed");
-    return attachSourceReplyDeliveryMode({ queuedFinal, counts, beforeAgentRunBlocked });
+    return attachSourceReplyDeliveryMode({
+      queuedFinal,
+      counts,
+      ...(beforeAgentRunBlocked ? { beforeAgentRunBlocked } : {}),
+    });
   } catch (err) {
     if (inboundDedupeClaim.status === "claimed") {
       if (inboundDedupeReplayUnsafe) {
