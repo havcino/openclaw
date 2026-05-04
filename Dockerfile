@@ -264,6 +264,11 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 # here inherit node ownership instead of root-owned state.
 RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
     stat -c '%U:%G %a' /home/node/.openclaw | grep -qx 'node:node 700'
+    
+RUN npm install -g @tobilu/qmd && \
+ qmd -v && \
+ qmd embed && \
+ qmd update
 
 ENV NODE_ENV=production
 
