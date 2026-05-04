@@ -23,7 +23,11 @@ import {
   getHeader,
   resolveTrustedHttpOperatorScopes,
 } from "./http-utils.js";
-import { ADMIN_SCOPE, WRITE_SCOPE, authorizeOperatorScopesForMethod } from "./method-scopes.js";
+import {
+  ADMIN_SCOPE,
+  TALK_SECRETS_SCOPE,
+  authorizeOperatorScopesForMethod,
+} from "./method-scopes.js";
 import { DEFAULT_CHAT_HISTORY_TEXT_MAX_CHARS } from "./server-methods/chat.js";
 import {
   buildSessionHistorySnapshot,
@@ -85,7 +89,7 @@ function shouldIncludeBlockedOriginalContent(
     return false;
   }
   const scopes = resolveTrustedHttpOperatorScopes(req, requestAuth);
-  return scopes.includes(ADMIN_SCOPE) || scopes.includes(WRITE_SCOPE);
+  return scopes.includes(ADMIN_SCOPE) || scopes.includes(TALK_SECRETS_SCOPE);
 }
 
 function canonicalizePath(value: string | undefined): string | undefined {
@@ -307,7 +311,7 @@ export async function handleSessionHistoryHttpRequest(
     if (
       includeBlockedOriginalContent &&
       !requestedScopes.includes(ADMIN_SCOPE) &&
-      !requestedScopes.includes(WRITE_SCOPE)
+      !requestedScopes.includes(TALK_SECRETS_SCOPE)
     ) {
       return false;
     }

@@ -237,6 +237,9 @@ enum ExecApprovalsPromptPresenter {
         alert.accessoryView = self.buildAccessoryView(request)
 
         let decisions = self.renderedDecisions(request)
+        if decisions.isEmpty {
+            return .deny
+        }
         for decision in decisions {
             alert.addButton(withTitle: self.buttonTitle(decision))
         }
@@ -260,7 +263,7 @@ enum ExecApprovalsPromptPresenter {
         let defaults: [ExecApprovalDecision] = [.allowOnce, .allowAlways, .deny]
         let allowed = request.allowedDecisions ?? defaults
         let decisions = defaults.filter { allowed.contains($0) }
-        return decisions.isEmpty ? [.deny] : decisions
+        return decisions
     }
 
     private static func buttonTitle(_ decision: ExecApprovalDecision) -> String {

@@ -252,7 +252,7 @@ describe("session history SSE auth revocation", () => {
   });
 
   it("includes blocked originals on authorized live inline SSE updates", async () => {
-    currentScopes = ["operator.read", "operator.write"];
+    currentScopes = ["operator.read", "operator.talk.secrets"];
     const req = new MockReq("/sessions/agent%3Amain/history?includeBlockedOriginalContent=true");
     const res = new MockRes();
 
