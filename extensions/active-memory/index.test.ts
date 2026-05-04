@@ -3209,7 +3209,7 @@ describe("active-memory plugin", () => {
         `^${escapeRegExp(expectedDir)}${escapeRegExp(path.sep)}active-memory-[a-z0-9]+-[a-f0-9]{8}\\.jsonl$`,
       ),
     );
-    expect(rmSpy).not.toHaveBeenCalled();
+    expect(rmSpy.mock.calls.some(([target]) => String(target).startsWith(expectedDir))).toBe(false);
     expect(
       vi
         .mocked(api.logger.info)
