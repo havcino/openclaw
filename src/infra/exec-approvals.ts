@@ -107,6 +107,12 @@ export type SystemRunApprovalPlan = {
   mutableFileOperand?: SystemRunApprovalFileOperand | null;
 };
 
+export type ExecApprovalCommandHighlight = {
+  startIndex: number;
+  endIndex: number;
+  kind: "command" | "risk";
+};
+
 export type ExecApprovalRequestPayload = {
   command: string;
   commandPreview?: string | null;
@@ -121,6 +127,8 @@ export type ExecApprovalRequestPayload = {
   security?: string | null;
   ask?: string | null;
   warningText?: string | null;
+  commandExplanationLines?: string[];
+  commandExplanationHighlights?: ExecApprovalCommandHighlight[];
   allowedDecisions?: readonly ExecApprovalDecision[];
   agentId?: string | null;
   resolvedPath?: string | null;

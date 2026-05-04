@@ -3338,6 +3338,21 @@ td.data-table-key-col {
   font-size: 13px;
 }
 
+.exec-approval-command-highlight {
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.exec-approval-command-highlight.command {
+  background: color-mix(in srgb, var(--primary) 18%, transparent);
+  color: var(--fg);
+}
+
+.exec-approval-command-highlight.risk {
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
+  color: var(--fg);
+}
+
 .exec-approval-meta {
   margin-top: 12px;
   display: grid;

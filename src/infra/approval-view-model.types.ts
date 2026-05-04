@@ -35,6 +35,7 @@ export type ExecApprovalViewBase = ApprovalViewBase & {
   ask?: string | null;
   agentId?: string | null;
   warningText?: string | null;
+  commandExplanationLines?: readonly string[];
   commandText: string;
   commandPreview?: string | null;
   cwd?: string | null;

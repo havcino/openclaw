@@ -5,6 +5,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { createChannelTestPluginBase, createTestRegistry } from "../test-utils/channel-plugins.js";
 import { createExecApprovalForwarder } from "./exec-approval-forwarder.js";
+import type { ExecApprovalRequest } from "./exec-approvals.js";
 
 const baseRequest = {
   id: "req-1",
@@ -304,7 +305,11 @@ async function expectSessionFilterRequestResult(params: {
   expect(deliver).toHaveBeenCalledTimes(params.expectedDeliveryCount);
 }
 
-async function expectForwardedApprovalText(params: { command?: string; expectedText: string }) {
+async function expectForwardedApprovalText(params: {
+  command?: string;
+  request?: Partial<ExecApprovalRequest["request"]>;
+  expectedText: string;
+}) {
   vi.useFakeTimers();
   const { deliver, forwarder } = createForwarder({ cfg: TARGETS_CFG });
   await expect(
@@ -313,6 +318,7 @@ async function expectForwardedApprovalText(params: { command?: string; expectedT
       request: {
         ...baseRequest.request,
         ...(params.command ? { command: params.command } : {}),
+        ...params.request,
       },
     }),
   ).resolves.toBe(true);
@@ -353,6 +359,19 @@ describe("exec approval forwarder", () => {
 
     await vi.advanceTimersByTimeAsync(baseRequest.expiresAtMs - baseRequest.createdAtMs);
     expect(deliver).toHaveBeenCalledTimes(2);
+  });
+
+  it("includes command explanation lines in forwarded exec approval messages", async () => {
+    await expectForwardedApprovalText({
+      request: {
+        commandExplanationLines: [
+          "Runs 3 programs: ls, grep, and python.",
+          "Warning: python -c runs inline code.",
+        ],
+      },
+      expectedText:
+        "Command explanation:\n- Runs 3 programs: ls, grep, and python.\n- Warning: python -c runs inline code.",
+    });
   });
 
   it("forwards to explicit targets and expires", async () => {

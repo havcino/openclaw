@@ -9,6 +9,12 @@ export type ExecApprovalRequestPayload = {
   agentId?: string | null;
   resolvedPath?: string | null;
   sessionKey?: string | null;
+  commandExplanationLines?: readonly string[];
+  commandExplanationHighlights?: readonly {
+    startIndex: number;
+    endIndex: number;
+    kind: "command" | "risk";
+  }[];
 };
 
 export type ExecApprovalRequest = {
@@ -32,6 +38,42 @@ export type ExecApprovalResolved = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
+}
+
+function parseCommandExplanationHighlights(
+  value: unknown,
+): { startIndex: number; endIndex: number; kind: "command" | "risk" }[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const highlights = value.filter(
+    (item): item is { startIndex: number; endIndex: number; kind: "command" | "risk" } => {
+      if (!isRecord(item)) {
+        return false;
+      }
+      const { startIndex, endIndex, kind } = item;
+      return (
+        Number.isSafeInteger(startIndex) &&
+        Number.isSafeInteger(endIndex) &&
+        typeof startIndex === "number" &&
+        typeof endIndex === "number" &&
+        endIndex > startIndex &&
+        (kind === "command" || kind === "risk")
+      );
+    },
+  );
+  return highlights.length > 0 ? highlights : undefined;
+}
+
+function parseCommandExplanationLines(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const lines = value
+    .filter((line): line is string => typeof line === "string")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  return lines.length > 0 ? lines : undefined;
 }
 
 export function parseExecApprovalRequested(payload: unknown): ExecApprovalRequest | null {
@@ -64,6 +106,10 @@ export function parseExecApprovalRequested(payload: unknown): ExecApprovalReques
       agentId: typeof request.agentId === "string" ? request.agentId : null,
       resolvedPath: typeof request.resolvedPath === "string" ? request.resolvedPath : null,
       sessionKey: typeof request.sessionKey === "string" ? request.sessionKey : null,
+      commandExplanationLines: parseCommandExplanationLines(request.commandExplanationLines),
+      commandExplanationHighlights: parseCommandExplanationHighlights(
+        request.commandExplanationHighlights,
+      ),
     },
     createdAtMs,
     expiresAtMs,

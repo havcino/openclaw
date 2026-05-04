@@ -96,3 +96,27 @@ describe("parsePluginApprovalRequested", () => {
     expect(result!.request.sessionKey).toBeNull();
   });
 });
+
+describe("parseExecApprovalRequested command explanations", () => {
+  it("preserves command explanation lines from exec approval events", () => {
+    const parsed = parseExecApprovalRequested({
+      id: "approval-explain-1",
+      request: {
+        command: "ls | grep stuff",
+        commandExplanationLines: [
+          " Runs 2 programs: ls and grep. ",
+          "",
+          123,
+          "Warning: grep uses a pattern.",
+        ],
+      },
+      createdAtMs: 1,
+      expiresAtMs: 2,
+    });
+
+    expect(parsed?.request.commandExplanationLines).toEqual([
+      "Runs 2 programs: ls and grep.",
+      "Warning: grep uses a pattern.",
+    ]);
+  });
+});

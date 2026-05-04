@@ -424,6 +424,33 @@ describe("connectGateway", () => {
     expect(host.lastErrorCode).toBeNull();
   });
 
+  it("routes exec approval requested events with command explanation lines", () => {
+    const { host, client } = connectHostGateway();
+
+    client.emitEvent({
+      event: "exec.approval.requested",
+      payload: {
+        id: "approval-explain-1",
+        request: {
+          command: 'ls | grep "stuff" | python -c \'print("hi")\'',
+          host: "gateway",
+          commandExplanationLines: [
+            "Runs 3 programs: ls, grep, and python.",
+            "Warning: python -c runs inline code.",
+          ],
+        },
+        createdAtMs: Date.now(),
+        expiresAtMs: Date.now() + 60_000,
+      },
+    });
+
+    expect(host.execApprovalQueue).toHaveLength(1);
+    expect(host.execApprovalQueue[0]?.request.commandExplanationLines).toEqual([
+      "Runs 3 programs: ls, grep, and python.",
+      "Warning: python -c runs inline code.",
+    ]);
+  });
+
   it("preserves pending approval requests across reconnect", () => {
     const host = createHost();
     host.execApprovalQueue = [

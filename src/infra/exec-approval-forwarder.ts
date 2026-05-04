@@ -243,6 +243,12 @@ function buildRequestMessage(request: ExecApprovalRequest, nowMs: number) {
     lines.push("Command:");
     lines.push(command.text);
   }
+  const explanationLines = request.request.commandExplanationLines
+    ?.map((line) => line.trim())
+    .filter(Boolean);
+  if (explanationLines?.length) {
+    lines.push("", "Command explanation:", ...explanationLines.map((line) => `- ${line}`));
+  }
   if (request.request.cwd) {
     lines.push(`CWD: ${request.request.cwd}`);
   }

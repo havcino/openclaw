@@ -1327,6 +1327,30 @@ describe("exec approval handlers", () => {
     expect(request["warningText"]).not.toContain("\\u{A}");
   });
 
+  it("accepts and sanitizes exec approval command explanation lines", async () => {
+    const { handlers, broadcasts, respond, context } = createExecApprovalFixture();
+    await requestExecApproval({
+      handlers,
+      respond,
+      context,
+      params: {
+        timeoutMs: 10,
+        commandExplanationLines: [
+          "Runs 3 programs: ls, grep, and python.\r\n",
+          "",
+          "Warning: python -c runs inline code.\u200B",
+        ],
+      },
+    });
+    const requested = broadcasts.find((entry) => entry.event === "exec.approval.requested");
+    expect(requested).toBeTruthy();
+    const request = (requested?.payload as { request?: Record<string, unknown> })?.request ?? {};
+    expect(request["commandExplanationLines"]).toEqual([
+      "Runs 3 programs: ls, grep, and python.",
+      "Warning: python -c runs inline code.\\u{200B}",
+    ]);
+  });
+
   it("accepts resolve during broadcast", async () => {
     const manager = new ExecApprovalManager();
     const handlers = createExecApprovalHandlers(manager);
