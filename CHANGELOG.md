@@ -168,6 +168,7 @@ Docs: https://docs.openclaw.ai
 - QA/Codex harness: fail before building the live Docker image when `codex-auth` has no host `~/.codex/auth.json`, and point Testbox/API-key runs at `OPENCLAW_LIVE_CODEX_HARNESS_AUTH=api-key` plus `openclaw-testbox-env`. Thanks @vincentkoc.
 - Codex commands: reject `/codex bind` options with missing values before starting Codex, so flag typos cannot turn `--model` or `--provider` into a bogus workspace path. Thanks @vincentkoc.
 - Codex commands: accept quoted `/codex` arguments, so `/codex bind --cwd "/path with spaces"` works for real workspace paths instead of falling into usage help. Thanks @vincentkoc.
+- Codex commands: reject extra operands on `/codex fast` and `/codex permissions`, so typoed full-access permission commands fail closed instead of silently applying the first token. Thanks @vincentkoc.
 - Slack/Matrix: avoid creating blank progress-draft messages when `streaming.progress.label=false` and progress tool lines are disabled. Thanks @vincentkoc.
 - Slack/Discord: suppress standalone tool-progress chatter when partial preview streaming has `streaming.preview.toolProgress: false`, matching the documented quiet-preview behavior. Thanks @vincentkoc.
 - QA/Matrix: keep the mock OpenAI tool-progress provider aligned with exact-marker Matrix prompts so the hardened live preview scenario still forces a deterministic read before final delivery. Thanks @vincentkoc.
