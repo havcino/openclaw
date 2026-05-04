@@ -468,10 +468,7 @@ export async function statPathWithinRoot(params: {
   let stat: Stats;
   try {
     if (process.platform === "win32") {
-      stat =
-        params.followSymlinks === false
-          ? await fs.lstat(resolved.canonicalPath)
-          : await fs.stat(resolved.canonicalPath);
+      throw new SafeOpenError("invalid-path", "safe stat helper unavailable on Windows");
     } else {
       const stdout = await runPinnedPathHelper({
         operation: "stat",
@@ -488,23 +485,10 @@ export async function statPathWithinRoot(params: {
       }
     }
   } catch (err) {
-    if (isPinnedPathHelperSpawnError(err) || process.platform === "win32") {
-      try {
-        stat =
-          params.followSymlinks === false
-            ? await fs.lstat(resolved.canonicalPath)
-            : await fs.stat(resolved.canonicalPath);
-      } catch (fallbackErr) {
-        if (isNotFoundPathError(fallbackErr)) {
-          if (params.allowMissing === true) {
-            return { exists: false, kind: "missing" };
-          }
-          throw new SafeOpenError("not-found", "file not found", {
-            cause: fallbackErr instanceof Error ? fallbackErr : undefined,
-          });
-        }
-        throw fallbackErr;
-      }
+    if (isPinnedPathHelperSpawnError(err)) {
+      throw new SafeOpenError("invalid-path", "safe stat helper unavailable", {
+        cause: err instanceof Error ? err : undefined,
+      });
     } else {
       const normalized = normalizePinnedPathError(err);
       if (normalized instanceof SafeOpenError && normalized.code === "not-found") {
@@ -544,7 +528,7 @@ export async function readdirWithinRoot(params: {
     allowRoot: true,
   });
   if (process.platform === "win32") {
-    return await readdirWithinRootLegacy(resolved);
+    throw new SafeOpenError("invalid-path", "safe directory listing helper unavailable on Windows");
   }
   try {
     const stdout = await runPinnedPathHelper({
@@ -559,7 +543,9 @@ export async function readdirWithinRoot(params: {
     return entries;
   } catch (error) {
     if (isPinnedPathHelperSpawnError(error)) {
-      return await readdirWithinRootLegacy(resolved);
+      throw new SafeOpenError("invalid-path", "safe directory listing helper unavailable", {
+        cause: error instanceof Error ? error : undefined,
+      });
     }
     throw normalizePinnedPathError(error);
   }
@@ -933,8 +919,7 @@ export async function renamePathWithinRoot(params: {
     throw new SafeOpenError("outside-workspace", "rename roots do not match");
   }
   if (process.platform === "win32") {
-    await renamePathWithinRootLegacy({ from, to, overwrite: params.overwrite });
-    return;
+    throw new SafeOpenError("invalid-path", "safe rename helper unavailable on Windows");
   }
   try {
     await runPinnedPathHelper({
@@ -946,8 +931,9 @@ export async function renamePathWithinRoot(params: {
     });
   } catch (error) {
     if (isPinnedPathHelperSpawnError(error)) {
-      await renamePathWithinRootLegacy({ from, to, overwrite: params.overwrite });
-      return;
+      throw new SafeOpenError("invalid-path", "safe rename helper unavailable", {
+        cause: error instanceof Error ? error : undefined,
+      });
     }
     throw normalizePinnedPathError(error);
   }
@@ -1286,29 +1272,6 @@ function normalizePinnedPathError(error: unknown): Error {
 
 async function removePathWithinRootLegacy(resolved: { resolved: string }): Promise<void> {
   await fs.rm(resolved.resolved);
-}
-
-async function readdirWithinRootLegacy(resolved: { resolved: string }): Promise<string[]> {
-  return (await fs.readdir(resolved.resolved)).toSorted();
-}
-
-async function renamePathWithinRootLegacy(params: {
-  from: { resolved: string };
-  to: { resolved: string };
-  overwrite?: boolean;
-}): Promise<void> {
-  if (params.overwrite !== true) {
-    try {
-      await fs.lstat(params.to.resolved);
-      throw new SafeOpenError("invalid-path", "destination already exists");
-    } catch (err) {
-      if (!isNotFoundPathError(err)) {
-        throw err;
-      }
-    }
-  }
-  await fs.mkdir(path.dirname(params.to.resolved), { recursive: true });
-  await fs.rename(params.from.resolved, params.to.resolved);
 }
 
 async function mkdirPathWithinRootLegacy(resolved: { resolved: string }): Promise<void> {
