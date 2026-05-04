@@ -241,12 +241,13 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
   const m = message as Record<string, unknown>;
   let role = typeof m.role === "string" ? m.role : "unknown";
   let isBlockedOriginalContent = false;
+  let contentRaw = m.content;
 
   if (role === "user") {
     const oc = m.__openclaw as Record<string, unknown> | undefined;
     const obc = oc?.originalBlockedContent as { content?: unknown } | undefined;
     if (obc && Array.isArray(obc.content) && obc.content.length > 0) {
-      m.content = obc.content;
+      contentRaw = obc.content;
       isBlockedOriginalContent = true;
     }
   }
@@ -255,7 +256,6 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
   // Some tool events come through as assistant role with tool_* items in the content array.
   const hasToolId = typeof m.toolCallId === "string" || typeof m.tool_call_id === "string";
 
-  const contentRaw = m.content;
   const contentItems = Array.isArray(contentRaw) ? contentRaw : null;
   const hasToolContent =
     Array.isArray(contentItems) &&
@@ -276,17 +276,17 @@ export function normalizeMessage(message: unknown): NormalizedMessage {
   let audioAsVoice = false;
   let replyTarget: NormalizedMessage["replyTarget"] = null;
 
-  if (typeof m.content === "string") {
+  if (typeof contentRaw === "string") {
     if (isAssistantMessage) {
-      const expanded = expandTextContent(m.content);
+      const expanded = expandTextContent(contentRaw);
       content = expanded.content;
       audioAsVoice = expanded.audioAsVoice;
       replyTarget = expanded.replyTarget;
     } else {
-      content = [{ type: "text", text: m.content }];
+      content = [{ type: "text", text: contentRaw }];
     }
-  } else if (Array.isArray(m.content)) {
-    content = m.content.flatMap((item: Record<string, unknown>) => {
+  } else if (Array.isArray(contentRaw)) {
+    content = contentRaw.flatMap((item: Record<string, unknown>) => {
       if (
         item.type === "attachment" &&
         item.attachment &&
