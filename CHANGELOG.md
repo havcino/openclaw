@@ -170,6 +170,7 @@ Docs: https://docs.openclaw.ai
 - Codex commands: accept quoted `/codex` arguments, so `/codex bind --cwd "/path with spaces"` works for real workspace paths instead of falling into usage help. Thanks @vincentkoc.
 - Codex commands: reject extra operands on `/codex fast` and `/codex permissions`, so typoed full-access permission commands fail closed instead of silently applying the first token. Thanks @vincentkoc.
 - Codex conversation binding: fall back to the inbound message content when a channel supplies an empty `bodyForAgent`, so bound Codex conversations do not silently swallow valid turns. Thanks @vincentkoc.
+- Codex conversation binding: decode `file://` image attachment paths before sending them to Codex as local images, so workspace paths with spaces resolve to the real file. Thanks @vincentkoc.
 - Slack/Matrix: avoid creating blank progress-draft messages when `streaming.progress.label=false` and progress tool lines are disabled. Thanks @vincentkoc.
 - Slack/Discord: suppress standalone tool-progress chatter when partial preview streaming has `streaming.preview.toolProgress: false`, matching the documented quiet-preview behavior. Thanks @vincentkoc.
 - QA/Matrix: keep the mock OpenAI tool-progress provider aligned with exact-marker Matrix prompts so the hardened live preview scenario still forces a deterministic read before final delivery. Thanks @vincentkoc.
