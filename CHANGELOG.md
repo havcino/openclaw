@@ -166,6 +166,7 @@ Docs: https://docs.openclaw.ai
 - Tooling/checks: make local `OPENCLAW_TESTBOX=1 pnpm check:changed` delegate through the Blacksmith Testbox runner instead of silently running the heavy changed gate on the operator machine. Thanks @vincentkoc.
 - QA/Codex harness: run `openclaw qa coverage --json` from source when private QA dist facades are missing, so implicit source-checkout builds cannot put build output before the machine-readable coverage JSON. Thanks @vincentkoc.
 - QA/Codex harness: fail before building the live Docker image when `codex-auth` has no host `~/.codex/auth.json`, and point Testbox/API-key runs at `OPENCLAW_LIVE_CODEX_HARNESS_AUTH=api-key` plus `openclaw-testbox-env`. Thanks @vincentkoc.
+- Codex commands: reject `/codex bind` options with missing values before starting Codex, so flag typos cannot turn `--model` or `--provider` into a bogus workspace path. Thanks @vincentkoc.
 - Slack/Matrix: avoid creating blank progress-draft messages when `streaming.progress.label=false` and progress tool lines are disabled. Thanks @vincentkoc.
 - Slack/Discord: suppress standalone tool-progress chatter when partial preview streaming has `streaming.preview.toolProgress: false`, matching the documented quiet-preview behavior. Thanks @vincentkoc.
 - QA/Matrix: keep the mock OpenAI tool-progress provider aligned with exact-marker Matrix prompts so the hardened live preview scenario still forces a deterministic read before final delivery. Thanks @vincentkoc.
