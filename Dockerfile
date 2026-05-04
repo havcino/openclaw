@@ -270,6 +270,13 @@ RUN npm install -g @tobilu/qmd && \
  qmd embed && \
  qmd update
 
+RUN /bin/bash -c "$(curl -fsSL https://mir.azhcha.com/git/Homebrew/install/HEAD/install.sh)"
+ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+RUN git -C "$(brew --repo)" remote set-url origin https://mir.azhcha.com/git/Homebrew/brew.git \
+    && git -C "$(brew --repo homebrew/core)" remote set-url origin https://mir.azhcha.com/git/Homebrew/homebrew-core.git \
+    && echo 'export HOMEBREW_BOTTLE_DOMAIN=https://mir.azhcha.com/homebrew-bottle' >> /etc/profile
+RUN brew --version
+
 ENV NODE_ENV=production
 
 # Security hardening: Run as non-root user
