@@ -300,6 +300,14 @@ function areAnyFeishuReactionActionsEnabled(cfg: ClawdbotConfig): boolean {
   return false;
 }
 
+function isFeishuGroupTopicSessionKey(sessionKey: string | null | undefined): boolean {
+  if (typeof sessionKey !== "string" || !sessionKey) {
+    return false;
+  }
+  const parsed = parseFeishuConversationId({ conversationId: sessionKey });
+  return parsed?.scope === "group_topic" || parsed?.scope === "group_topic_sender";
+}
+
 function isSupportedFeishuDirectConversationId(conversationId: string): boolean {
   const trimmed = conversationId.trim();
   if (!trimmed || trimmed.includes(":")) {
