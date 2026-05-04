@@ -269,12 +269,7 @@ RUN npm install -g @tobilu/qmd && \
  qmd -v && \
  qmd embed && \
  qmd update
-
-RUN /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-ENV PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
-RUN brew analytics off
-ENV HOMEBREW_BOTTLE_DOMAIN=https://mirrors.tuna.tsinghua.edu.cn/homebrew-bottles
-
+ 
 ENV NODE_ENV=production
 
 # Security hardening: Run as non-root user
