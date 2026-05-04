@@ -39,6 +39,7 @@ import {
   type NativeHookRelayRegistrationHandle,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
 import { emitTrustedDiagnosticEvent } from "openclaw/plugin-sdk/diagnostic-runtime";
+import { markCodexAppServerEventGloballyEmitted } from "./agent-event-forwarding.js";
 import { handleCodexAppServerApprovalRequest } from "./approval-bridge.js";
 import {
   refreshCodexAppServerAuthTokens,
@@ -140,7 +141,7 @@ function emitCodexAppServerEvent(
     embeddedAgentLog.debug("codex app-server global agent event emit failed", { error });
   }
   try {
-    const maybePromise = params.onAgentEvent?.(event);
+    const maybePromise = params.onAgentEvent?.(markCodexAppServerEventGloballyEmitted(event));
     void Promise.resolve(maybePromise).catch((error: unknown) => {
       embeddedAgentLog.debug("codex app-server agent event handler rejected", { error });
     });

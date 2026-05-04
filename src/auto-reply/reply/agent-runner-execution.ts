@@ -94,6 +94,14 @@ const GPT_CHAT_BREVITY_ACK_MAX_CHARS = 420;
 const GPT_CHAT_BREVITY_ACK_MAX_SENTENCES = 3;
 const GPT_CHAT_BREVITY_SOFT_MAX_CHARS = 900;
 const GPT_CHAT_BREVITY_SOFT_MAX_SENTENCES = 6;
+const CODEX_APP_SERVER_GLOBAL_EVENT_SET_KEY = Symbol.for(
+  "openclaw.codexAppServerGlobalAgentEvents",
+);
+
+function wasCodexAppServerEventGloballyEmitted(event: object): boolean {
+  const state = globalThis as Record<symbol, WeakSet<object> | undefined>;
+  return state[CODEX_APP_SERVER_GLOBAL_EVENT_SET_KEY]?.has(event) === true;
+}
 
 function readApprovalScopeValue(value: unknown): "turn" | "session" | undefined {
   return value === "turn" || value === "session" ? value : undefined;
@@ -1509,7 +1517,10 @@ export async function runAgentTurnWithFallback(params: {
                 onReasoningEnd: params.opts?.onReasoningEnd,
                 onAgentEvent: async (evt) => {
                   lifecycleBackstop.note(evt);
-                  if (evt.stream.startsWith("codex_app_server.")) {
+                  if (
+                    evt.stream.startsWith("codex_app_server.") &&
+                    !wasCodexAppServerEventGloballyEmitted(evt)
+                  ) {
                     emitAgentEvent({
                       runId,
                       stream: evt.stream,

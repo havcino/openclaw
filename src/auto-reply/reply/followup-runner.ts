@@ -37,6 +37,15 @@ import { incrementRunCompactionCount, persistRunSessionUsage } from "./session-r
 import { createTypingSignaler } from "./typing-mode.js";
 import type { TypingController } from "./typing.js";
 
+const CODEX_APP_SERVER_GLOBAL_EVENT_SET_KEY = Symbol.for(
+  "openclaw.codexAppServerGlobalAgentEvents",
+);
+
+function wasCodexAppServerEventGloballyEmitted(event: object): boolean {
+  const state = globalThis as Record<symbol, WeakSet<object> | undefined>;
+  return state[CODEX_APP_SERVER_GLOBAL_EVENT_SET_KEY]?.has(event) === true;
+}
+
 type EmbeddedAgentRunResult = Awaited<ReturnType<typeof runEmbeddedPiAgent>>;
 
 export function createFollowupRunner(params: {
@@ -332,7 +341,10 @@ export function createFollowupRunner(params: {
                     bootstrapPromptWarningSignaturesSeen.length - 1
                   ],
                 onAgentEvent: (evt) => {
-                  if (evt.stream.startsWith("codex_app_server.")) {
+                  if (
+                    evt.stream.startsWith("codex_app_server.") &&
+                    !wasCodexAppServerEventGloballyEmitted(evt)
+                  ) {
                     emitAgentEvent({
                       runId,
                       stream: evt.stream,

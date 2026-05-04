@@ -161,6 +161,7 @@ Docs: https://docs.openclaw.ai
 - QA/cache: require the full `CACHE-OK <suffix>` marker before live cache probes stop retrying, so suffix-only prose cannot hide a broken probe response. Thanks @vincentkoc.
 - Codex harness: find the app-server protocol source checkout from `gwt` worktrees before checking or syncing generated schemas, so maintainers do not have to set `OPENCLAW_CODEX_REPO` just to run the protocol drift gate. Thanks @vincentkoc.
 - Codex harness QA: mount live Docker cache and CLI-tool directories outside the bind-mounted container home, relax CI temp-dir permissions, and treat `CI=1` as CI so Blacksmith/Testbox Codex harness runs can create npm/corepack cache directories. Thanks @vincentkoc.
+- Codex harness: avoid double-publishing `codex_app_server.*` telemetry on the global agent-event bus when the plugin already emitted the event before the runner bridge receives it. Thanks @vincentkoc.
 - Slack/Matrix: avoid creating blank progress-draft messages when `streaming.progress.label=false` and progress tool lines are disabled. Thanks @vincentkoc.
 - Slack/Discord: suppress standalone tool-progress chatter when partial preview streaming has `streaming.preview.toolProgress: false`, matching the documented quiet-preview behavior. Thanks @vincentkoc.
 - QA/Matrix: keep the mock OpenAI tool-progress provider aligned with exact-marker Matrix prompts so the hardened live preview scenario still forces a deterministic read before final delivery. Thanks @vincentkoc.

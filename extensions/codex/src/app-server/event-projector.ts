@@ -18,6 +18,7 @@ import {
   type MessagingToolSend,
   type ToolProgressDetailMode,
 } from "openclaw/plugin-sdk/agent-harness-runtime";
+import { markCodexAppServerEventGloballyEmitted } from "./agent-event-forwarding.js";
 import { readCodexTurn } from "./protocol-validators.js";
 import {
   isJsonObject,
@@ -735,7 +736,9 @@ export class CodexAppServerEventProjector {
       embeddedAgentLog.debug("codex app-server global agent event emit failed", { error });
     }
     try {
-      const maybePromise = this.params.onAgentEvent?.(event);
+      const maybePromise = this.params.onAgentEvent?.(
+        markCodexAppServerEventGloballyEmitted(event),
+      );
       void Promise.resolve(maybePromise).catch((error: unknown) => {
         embeddedAgentLog.debug("codex app-server agent event handler rejected", { error });
       });

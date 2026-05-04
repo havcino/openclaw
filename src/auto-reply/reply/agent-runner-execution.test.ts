@@ -1227,6 +1227,41 @@ describe("runAgentTurnWithFallback", () => {
     });
   });
 
+  it("does not republish Codex app-server telemetry already emitted globally", async () => {
+    const agentEvents = await import("../../infra/agent-events.js");
+    const emitAgentEvent = vi.mocked(agentEvents.emitAgentEvent);
+    const globalEventSetKey = Symbol.for("openclaw.codexAppServerGlobalAgentEvents");
+    const globalState = globalThis as Record<symbol, WeakSet<object> | undefined>;
+    globalState[globalEventSetKey] = new WeakSet<object>();
+    state.runEmbeddedPiAgentMock.mockImplementationOnce(async (params: EmbeddedAgentParams) => {
+      const event = {
+        stream: "codex_app_server.guardian",
+        sessionKey: "agent:main:subagent:codex-child",
+        data: {
+          phase: "blocked",
+          message: "command requires approval",
+        },
+      };
+      globalState[globalEventSetKey]?.add(event);
+      await params.onAgentEvent?.(event);
+      return { payloads: [{ text: "final" }], meta: {} };
+    });
+
+    const runAgentTurnWithFallback = await getRunAgentTurnWithFallback();
+    const result = await runAgentTurnWithFallback({
+      ...createMinimalRunAgentTurnParams({ opts: { runId: "run-codex" } as GetReplyOptions }),
+      sessionKey: "main",
+    });
+
+    expect(result.kind).toBe("success");
+    expect(emitAgentEvent).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "run-codex",
+        stream: "codex_app_server.guardian",
+      }),
+    );
+  });
+
   it("emits an embedded lifecycle terminal backstop when the runner returns without one", async () => {
     const agentEvents = await import("../../infra/agent-events.js");
     const emitAgentEvent = vi.mocked(agentEvents.emitAgentEvent);
