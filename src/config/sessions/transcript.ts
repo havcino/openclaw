@@ -489,10 +489,15 @@ export async function appendBlockedUserMessageToSessionTranscript(params: {
 
   switch (params.updateMode ?? "inline") {
     case "inline": {
+      const messageWithBlockedOriginalContent = Object.assign({}, appendResult.jsonlEntry.message, {
+        __openclaw: {
+          originalBlockedContent: appendResult.jsonlEntry.originalBlockedContent,
+        },
+      });
       emitSessionTranscriptUpdate({
         sessionFile,
         sessionKey,
-        message: appendResult.jsonlEntry.message as Parameters<SessionManager["appendMessage"]>[0],
+        message: messageWithBlockedOriginalContent,
         messageId: appendResult.messageId,
       });
       break;

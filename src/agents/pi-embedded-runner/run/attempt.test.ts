@@ -23,6 +23,7 @@ import {
   resolveUnknownToolGuardThreshold,
   shouldCreateBundleMcpRuntimeForAttempt,
   shouldBuildCoreCodingToolsForAllowlist,
+  shouldRunLlmOutputHooksForAttempt,
   resolveAttemptToolPolicyMessageProvider,
   resolvePromptBuildHookResult,
   resolvePromptModeForSession,
@@ -217,6 +218,16 @@ describe("resolveAttemptToolPolicyMessageProvider", () => {
 
   it("falls back to message channel when provider is omitted", () => {
     expect(resolveAttemptToolPolicyMessageProvider({ messageChannel: "discord" })).toBe("discord");
+  });
+});
+
+describe("shouldRunLlmOutputHooksForAttempt", () => {
+  it("skips llm_output after before_agent_run blocks before model submission", () => {
+    expect(shouldRunLlmOutputHooksForAttempt({ promptErrorSource: "hook:before_agent_run" })).toBe(
+      false,
+    );
+    expect(shouldRunLlmOutputHooksForAttempt({ promptErrorSource: "prompt" })).toBe(true);
+    expect(shouldRunLlmOutputHooksForAttempt({ promptErrorSource: null })).toBe(true);
   });
 });
 
