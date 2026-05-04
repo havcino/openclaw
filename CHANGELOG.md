@@ -172,6 +172,7 @@ Docs: https://docs.openclaw.ai
 - Codex conversation binding: fall back to the inbound message content when a channel supplies an empty `bodyForAgent`, so bound Codex conversations do not silently swallow valid turns. Thanks @vincentkoc.
 - Codex conversation binding: decode `file://` image attachment paths before sending them to Codex as local images, so workspace paths with spaces resolve to the real file. Thanks @vincentkoc.
 - Codex conversation binding: treat local-looking `mediaUrl` values as `localImage` inputs for bound Codex turns, so staged files in OpenClaw metadata are not sent as invalid remote image URLs. Thanks @vincentkoc.
+- Codex conversation binding: preserve Windows absolute image paths in bound-turn media metadata as local images instead of mistaking the drive letter for a remote URL scheme. Thanks @vincentkoc.
 - Slack/Matrix: avoid creating blank progress-draft messages when `streaming.progress.label=false` and progress tool lines are disabled. Thanks @vincentkoc.
 - Slack/Discord: suppress standalone tool-progress chatter when partial preview streaming has `streaming.preview.toolProgress: false`, matching the documented quiet-preview behavior. Thanks @vincentkoc.
 - QA/Matrix: keep the mock OpenAI tool-progress provider aligned with exact-marker Matrix prompts so the hardened live preview scenario still forces a deterministic read before final delivery. Thanks @vincentkoc.
