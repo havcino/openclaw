@@ -39,6 +39,7 @@ Docs: https://docs.openclaw.ai
 - QA/Mantis: return the copied Slack desktop screenshot path even when remote Slack QA fails, so the CLI still prints the failure screenshot artifact. Thanks @vincentkoc.
 - QA/Mantis: accept Blacksmith Testbox `tbx_...` lease ids from desktop smoke warmup, so provider overrides do not fail before inspect/run. Thanks @vincentkoc.
 - QA/Slack: add a Slack live transport QA runner with canary and mention-gating coverage for the private bot-to-bot harness. Thanks @vincentkoc.
+- QA/Codex harness: add opt-in live Docker debug output for host mount state, container mount state, and final Docker args so Blacksmith failures can be diagnosed without rerunning blind. Thanks @vincentkoc.
 - Gateway/performance: lazy-load the heavy cron runtime after the rest of Gateway startup, defer restart-sentinel refresh after readiness, and let the Gateway startup benchmark write per-run V8 CPU profiles with `--cpu-prof-dir`.
 - Gateway/performance: keep raw channel-config schema parsing from discovering bundled plugin runtime metadata, and add `pnpm gateway:watch --benchmark-no-force` for profiling startup without the default port cleanup.
 - Plugins/onboarding: let Manual setup install optional official plugins, including ClawHub-backed diagnostics with npm fallback, and expose the external Codex plugin as a selectable provider setup choice. Thanks @vincentkoc.
