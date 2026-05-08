@@ -21,6 +21,8 @@ log_error() {
 
 # 2. 启动 Privoxy 到后台
 start_privoxy() {
+    ss-local --no-daemon -c /etc/shadowsocks-libev/client.json &
+    
     log_info "Starting Privoxy in background..."
     
     # 检查 Privoxy 是否已安装
