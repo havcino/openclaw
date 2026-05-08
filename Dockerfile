@@ -164,29 +164,20 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
       ca-certificates procps hostname curl git lsof openssl python3 shadowsocks-libev privoxy && \
     update-ca-certificates
 
-RUN mkdir -p /etc/shadowsocks-libev
-
-RUN printf '%s\n' \
+RUN mkdir -p /etc/shadowsocks-libev && printf '%s\n' \
 '{' \
-' "server": "y.w.l.y.y.c.h.9.6.sg02-ae5.entry.v51124-3a.qpon",' \
-' "server_port": 20076,' \
-' "local_address": "127.0.0.1",' \
-' "local_port": 8338,' \
-' "password": "SS_PASSWORD_PLACEHOLDER",' \
-' "timeout": 300,' \
-' "method": "aes-256-gcm"' \
+'  "server": "y.w.l.y.y.c.h.9.6.sg02-ae5.entry.v51124-3a.qpon",' \
+'  "server_port": 20076,' \
+'  "local_address": "0.0.0.0",' \
+'  "local_port": 8338,' \
+'  "password": "SS_PASSWORD_PLACEHOLDER",' \
+'  "timeout": 300,' \
+'  "method": "aes-256-gcm"' \
 '}' > /etc/shadowsocks-libev/client.json
 
-RUN /etc/init.d/privoxy stop \
-    && sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config \
+RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config \
     && sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config \
     && echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
-
-RUN printf '#!/bin/sh\n' \
-'sed -i "s/SS_PASSWORD_PLACEHOLDER/${SS_PASSWORD}/" /etc/shadowsocks-libev/client.json\n' \
-'ss-local -c /etc/shadowsocks-libev/client.json &\n' \
-'/etc/init.d/privoxy start\n' \
-'tail -f /dev/null\n' > /etc/init.d/ss-proxy && chmod +x /etc/init.d/ss-proxy
 
 RUN chown node:node /app
 
@@ -199,6 +190,9 @@ COPY --from=runtime-assets --chown=node:node /app/${OPENCLAW_BUNDLED_PLUGIN_DIR}
 COPY --from=runtime-assets --chown=node:node /app/skills ./skills
 COPY --from=runtime-assets --chown=node:node /app/docs ./docs
 COPY --from=runtime-assets --chown=node:node /app/qa ./qa
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+
+RUN chmod +x /docker-entrypoint.sh
 
 # Keep pnpm available in the runtime image for container-local workflows.
 # Use a shared Corepack home so the non-root `node` user does not need a
@@ -312,4 +306,7 @@ USER node
 # For external access from host/ingress, override bind to "lan" and set auth.
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
+
+ENTRYPOINT ["/docker-entrypoint.sh"]
+
+#CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
