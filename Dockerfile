@@ -188,7 +188,7 @@ RUN printf '#!/bin/sh\n' \
 '/etc/init.d/privoxy start\n' \
 'tail -f /dev/null\n' > /etc/init.d/ss-proxy && chmod +x /etc/init.d/ss-proxy
 
-RUN curl -x http://127.0.0.1:7890 https://www.google.com
+RUN /etc/init.d/ss-proxy && curl -x http://127.0.0.1:7890 https://www.google.com
 
 RUN chown node:node /app
 
