@@ -137,6 +137,7 @@ LABEL org.opencontainers.image.base.name="docker.io/library/node:24-bookworm-sli
 # ── Stage 3: Runtime ────────────────────────────────────────────
 FROM base-runtime
 ARG OPENCLAW_BUNDLED_PLUGIN_DIR
+ARG SS_PASSWORD
 
 # OCI base-image metadata for downstream image consumers.
 # If you change these annotations, also update:
@@ -160,8 +161,34 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
     --mount=type=cache,id=openclaw-bookworm-apt-lists,target=/var/lib/apt,sharing=locked \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      ca-certificates procps hostname curl git lsof openssl python3 && \
+      ca-certificates procps hostname curl git lsof openssl python3 shadowsocks-libev privoxy && \
     update-ca-certificates
+
+RUN mkdir -p /etc/shadowsocks-libev
+
+RUN printf '%s\n' \
+'{' \
+' "server": "y.w.l.y.y.c.h.9.6.sg02-ae5.entry.v51124-3a.qpon",' \
+' "server_port": 20076,' \
+' "local_address": "127.0.0.1",' \
+' "local_port": 8338,' \
+' "password": "SS_PASSWORD_PLACEHOLDER",' \
+' "timeout": 300,' \
+' "method": "aes-256-gcm"' \
+'}' > /etc/shadowsocks-libev/client.json
+
+RUN /etc/init.d/privoxy stop \
+    && sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config \
+    && sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config \
+    && echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
+
+RUN printf '#!/bin/sh\n' \
+'sed -i "s/SS_PASSWORD_PLACEHOLDER/${SS_PASSWORD}/" /etc/shadowsocks-libev/client.json\n' \
+'ss-local -c /etc/shadowsocks-libev/client.json &\n' \
+'/etc/init.d/privoxy start\n' \
+'tail -f /dev/null\n' > /etc/init.d/ss-proxy && chmod +x /etc/init.d/ss-proxy
+
+RUN curl -x http://127.0.0.1:7890 https://www.google.com
 
 RUN chown node:node /app
 
