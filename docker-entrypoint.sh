@@ -21,7 +21,7 @@ log_error() {
 
 # 2. 启动 Privoxy 到后台
 start_privoxy() {
-    ss-local --no-daemon -c /etc/shadowsocks-libev/client.json &
+    ss-local -c /etc/shadowsocks-libev/client.json &
     
     log_info "Starting Privoxy in background..."
     
@@ -40,7 +40,7 @@ start_privoxy() {
     MAX_RETRIES=30
     RETRY_COUNT=0
     
-    while ! nc -z localhost 8118 2>/dev/null; do
+    while ! nc -z localhost 7890 2>/dev/null; do
         RETRY_COUNT=$((RETRY_COUNT + 1))
         if [ $RETRY_COUNT -ge $MAX_RETRIES ]; then
             log_error "Privoxy failed to start within ${MAX_RETRIES} seconds"
