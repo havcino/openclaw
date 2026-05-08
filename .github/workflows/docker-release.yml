@@ -160,6 +160,7 @@ jobs:
             OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
             OPENCLAW_SANDBOX=1
             OPENCLAW_INSTALL_DOCKER_CLI=1
+            SS_PASSWORD=${{ vars.SS_PASSWORD }}
           tags: ${{ steps.tags.outputs.value }}
           labels: ${{ steps.labels.outputs.value }}
           sbom: true
@@ -262,6 +263,7 @@ jobs:
             OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
             OPENCLAW_SANDBOX=1
             OPENCLAW_INSTALL_DOCKER_CLI=1
+            SS_PASSWORD=${{ vars.SS_PASSWORD }}
           tags: ${{ steps.tags.outputs.value }}
           labels: ${{ steps.labels.outputs.value }}
           sbom: true
