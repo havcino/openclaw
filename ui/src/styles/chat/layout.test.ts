@@ -1,14 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
+import { readStyleSheet } from "../../../../test/helpers/ui-style-fixtures.js";
 
 function readLayoutCss(): string {
-  const cssPath = [
-    resolve(process.cwd(), "src/styles/chat/layout.css"),
-    resolve(process.cwd(), "ui/src/styles/chat/layout.css"),
-  ].find((candidate) => existsSync(candidate));
-  expect(cssPath).toBeTruthy();
-  return readFileSync(cssPath!, "utf8");
+  return readStyleSheet("ui/src/styles/chat/layout.css");
 }
 
 describe("chat layout styles", () => {
@@ -27,5 +21,13 @@ describe("chat layout styles", () => {
     expect(css).toContain(".agent-chat__avatar--text");
     expect(css).toContain("font-size: 20px;");
     expect(css).toContain("place-items: center;");
+  });
+
+  it("keeps composer text scale-driven while preserving mobile input zoom safety", () => {
+    const css = readLayoutCss();
+
+    expect(css).toContain("font-size: var(--control-ui-input-text-size);");
+    expect(css).toContain(".agent-chat__composer-combobox > textarea");
+    expect(css).toContain(".chat-compose .chat-compose__field textarea");
   });
 });
