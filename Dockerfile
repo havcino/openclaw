@@ -278,6 +278,10 @@ RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
 
 ENV NODE_ENV=production
 
+RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config && \
+    sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config && \
+    echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
+
 # Security hardening: Run as non-root user
 # The node:24-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
@@ -297,5 +301,6 @@ USER node
 # For external access from host/ingress, override bind to "lan" and set auth.
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-ENTRYPOINT ["tini", "-s", "--"]
-CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
+#ENTRYPOINT ["tini", "-s", "--"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+#CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
