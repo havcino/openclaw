@@ -276,6 +276,10 @@ RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
 
 ENV NODE_ENV=production
 
+RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config && \
+    sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config && \
+    echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
+
 # Security hardening: Run as non-root user
 # The node:24-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
