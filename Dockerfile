@@ -288,6 +288,10 @@ RUN ln -sf /app/openclaw.mjs /usr/local/bin/openclaw \
 RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
     stat -c '%U:%G %a' /home/node/.openclaw | grep -qx 'node:node 700'
 
+RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config && \
+    sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config && \
+    echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
+
 ENV NODE_ENV=production
 
 # Security hardening: Run as non-root user
@@ -309,5 +313,7 @@ USER node
 # For external access from host/ingress, override bind to "lan" and set auth.
 HEALTHCHECK --interval=3m --timeout=10s --start-period=15s --retries=3 \
   CMD node -e "fetch('http://127.0.0.1:18789/healthz').then((r)=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
-ENTRYPOINT ["tini", "-s", "--"]
-CMD ["node", "openclaw.mjs", "gateway"]
+
+#ENTRYPOINT ["tini", "-s", "--"]
+ENTRYPOINT ["/docker-entrypoint.sh"]
+#CMD ["node", "openclaw.mjs", "gateway"]
