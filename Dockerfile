@@ -292,6 +292,8 @@ RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /e
     sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config && \
     echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
 
+RUN sudo apt install --only-upgrade openssl
+
 ENV NODE_ENV=production
 
 # Security hardening: Run as non-root user
