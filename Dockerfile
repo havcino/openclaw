@@ -210,6 +210,8 @@ RUN --mount=type=cache,id=openclaw-bookworm-apt-cache,target=/var/cache/apt,shar
       apt-get update && \
       DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends $packages; \
     fi
+    
+RUN sudo apt install -y --only-upgrade openssl
 
 # Install additional Python packages needed by your plugins or skills.
 # Example: docker build --build-arg OPENCLAW_IMAGE_PIP_PACKAGES="requests humanize" .
@@ -291,8 +293,6 @@ RUN install -d -m 0700 -o node -g node /home/node/.openclaw && \
 RUN sed -i 's/listen-address  127.0.0.1:8118/listen-address  127.0.0.1:7890/' /etc/privoxy/config && \
     sed -i 's/listen-address  \[::1\]:8118/listen-address  \[::1\]:7890/' /etc/privoxy/config && \
     echo "forward-socks5 / 127.0.0.1:8338 ." >> /etc/privoxy/config
-
-RUN sudo apt install --only-upgrade openssl
 
 ENV NODE_ENV=production
 
