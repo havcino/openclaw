@@ -1,3 +1,4 @@
+// Feishu tests cover media plugin behavior.
 import { realpathSync } from "node:fs";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -301,9 +302,10 @@ describe("sendMediaFeishu msg_type routing", () => {
     });
 
     const ffmpegArgs = mockCallArg<string[]>(runFfmpegMock, 0, 0);
-    for (const arg of ["-c:a", "libopus", "-ar", "48000", "-b:a", "64k"]) {
+    for (const arg of ["-c:a", "libopus", "-ar", "48000", "-b:a", "64k", "-f", "ogg"]) {
       expect(ffmpegArgs).toContain(arg);
     }
+    expect(ffmpegArgs.slice(-3, -1)).toEqual(["-f", "ogg"]);
     const fileData = callData<{ file?: Buffer; file_name?: string; file_type?: string }>(
       fileCreateMock,
     );

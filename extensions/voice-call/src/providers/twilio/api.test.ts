@@ -1,3 +1,4 @@
+// Voice Call tests cover api plugin behavior.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const { fetchWithSsrFGuardMock } = vi.hoisted(() => ({
@@ -125,6 +126,25 @@ describe("twilioApiRequest", () => {
         body: {},
       }),
     ).rejects.toThrow("Twilio API error: 400 bad request");
+    expect(release).toHaveBeenCalledTimes(1);
+  });
+
+  it("wraps malformed json success responses with an owned error", async () => {
+    const release = vi.fn(async () => {});
+    fetchWithSsrFGuardMock.mockResolvedValue({
+      response: new Response("{not json", { status: 200 }),
+      release,
+    });
+
+    await expect(
+      twilioApiRequest({
+        baseUrl: "https://api.twilio.com",
+        accountSid: "AC123",
+        authToken: "secret",
+        endpoint: "/Calls.json",
+        body: {},
+      }),
+    ).rejects.toThrow("Twilio API returned malformed JSON.");
     expect(release).toHaveBeenCalledTimes(1);
   });
 

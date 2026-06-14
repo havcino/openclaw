@@ -1,3 +1,4 @@
+// Tavily tests cover tavily client plugin behavior.
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture every call to postTrustedWebToolsJson so we can assert on extraHeaders.
@@ -49,11 +50,33 @@ describe("tavily client X-Client-Source header", () => {
     expect(params.extraHeaders).toEqual({ "X-Client-Source": "openclaw" });
   });
 
+  it("runTavilySearch reports malformed JSON with a stable provider error", async () => {
+    postTrustedWebToolsJson.mockImplementationOnce(
+      async (_params: unknown, parse: (r: Response) => Promise<unknown>) =>
+        parse(new Response("{ nope")),
+    );
+
+    await expect(runTavilySearch({ query: "test query" })).rejects.toThrow(
+      "Tavily Search: malformed JSON response",
+    );
+  });
+
   it("runTavilyExtract sends X-Client-Source: openclaw", async () => {
     await runTavilyExtract({ urls: ["https://example.com"] });
 
     expect(postTrustedWebToolsJson).toHaveBeenCalledOnce();
     const params = postTrustedWebToolsJson.mock.calls[0]?.[0];
     expect(params.extraHeaders).toEqual({ "X-Client-Source": "openclaw" });
+  });
+
+  it("runTavilyExtract reports malformed JSON with a stable provider error", async () => {
+    postTrustedWebToolsJson.mockImplementationOnce(
+      async (_params: unknown, parse: (r: Response) => Promise<unknown>) =>
+        parse(new Response("{ nope")),
+    );
+
+    await expect(runTavilyExtract({ urls: ["https://example.com"] })).rejects.toThrow(
+      "Tavily Extract: malformed JSON response",
+    );
   });
 });

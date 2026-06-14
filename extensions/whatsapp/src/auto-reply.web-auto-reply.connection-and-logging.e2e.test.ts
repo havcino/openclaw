@@ -1,3 +1,4 @@
+// Whatsapp tests cover auto reply.web auto reply.connection and logging plugin behavior.
 import "./test-helpers.js";
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
@@ -12,7 +13,6 @@ import { WhatsAppAuthUnstableError, resolveWebCredsPath } from "./auth-store.js"
 import { resolveOAuthDir } from "./auth-store.runtime.js";
 import {
   createWebInboundDeliverySpies,
-  createAcceptedWhatsAppSendResult,
   createMockWebListener,
   createScriptedWebListenerFactory,
   createWebListenerFactoryCapture,
@@ -26,6 +26,31 @@ import {
   setRuntimeConfigSourceSnapshotMock,
   startWebAutoReplyMonitor,
 } from "./auto-reply.test-harness.js";
+import { waitForWaConnection } from "./session.js";
+import {
+  createTestLegacyFlatWebInboundMessage,
+  createTestWebInboundMessage,
+} from "./inbound/test-message.test-helper.js";
+import type { WebInboundMessageInput } from "./inbound/types.js";
+
+type DrainSelectionEntry = {
+  channel: string;
+  accountId?: string | null;
+  lastError?: string;
+};
+type DrainPendingDeliveriesCall = {
+  drainKey: string;
+  logLabel: string;
+  selectEntry: (entry: DrainSelectionEntry) => { match: boolean; bypassBackoff: boolean };
+};
+
+const deliveryQueueMocks = vi.hoisted(() => ({
+  drainPendingDeliveries: vi.fn(async (_opts: unknown) => undefined),
+}));
+
+vi.mock("openclaw/plugin-sdk/delivery-queue-runtime", () => ({
+  drainPendingDeliveries: deliveryQueueMocks.drainPendingDeliveries,
+}));
 
 installWebAutoReplyTestHomeHooks();
 
@@ -122,7 +147,7 @@ describe("web auto-reply connection", () => {
 
   it("handles helper envelope timestamps with trimmed timezones (regression)", () => {
     const d = new Date("2025-01-01T00:00:00.000Z");
-    expect(formatEnvelopeTimestamp(d, " America/Los_Angeles ")).toBe("Tue 2024-12-31 16:00 PST");
+    expect(formatEnvelopeTimestamp(d, " America/Los_Angeles ")).toBe("Tue 2024-12-31 16:00:00 PST");
   });
 
   it("handles reconnect progress and max-attempt stop behavior", async () => {
@@ -186,7 +211,7 @@ describe("web auto-reply connection", () => {
       },
     };
     const listenerFactory = vi.fn(async () => {
-      throw boom428;
+      throw toLintErrorObject(boom428, "Non-Error thrown");
     });
 
     const sleep = vi.fn(async () => {});
@@ -204,6 +229,33 @@ describe("web auto-reply connection", () => {
     expectErrorContaining(runtime.error, "status 428");
     expectErrorContaining(runtime.error, "Retry 1/2");
     expectErrorContaining(runtime.error, "2/2 attempts");
+  });
+
+  it("retries opening-phase connection wait timeouts through the reconnect policy", async () => {
+    vi.mocked(waitForWaConnection).mockRejectedValueOnce({ output: { statusCode: 408 } });
+    const listenerFactory = vi.fn(async () => createMockWebListener());
+    const sleep = vi.fn(async () => {});
+    const { runtime, controller, run } = startWebAutoReplyMonitor({
+      monitorWebChannelFn: monitorWebChannel as never,
+      listenerFactory,
+      sleep,
+      reconnect: { initialMs: 10, maxMs: 10, maxAttempts: 2, factor: 1.1 },
+    });
+
+    await vi.waitFor(
+      () => {
+        expect(listenerFactory).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 250, interval: 2 },
+    );
+    controller.abort();
+    await run;
+
+    expect(waitForWaConnection).toHaveBeenCalledTimes(2);
+    expect(listenerFactory).toHaveBeenCalledTimes(1);
+    expect(sleep).toHaveBeenCalled();
+    expectErrorContaining(runtime.error, "status 408");
+    expectErrorContaining(runtime.error, "Retry 1/2");
   });
 
   it("keeps post-open Baileys 428 on the reconnect path", async () => {
@@ -247,6 +299,78 @@ describe("web auto-reply connection", () => {
     expect(sleep).toHaveBeenCalled();
   });
 
+  it("drains pending deliveries while connected and stops after close", async () => {
+    vi.useFakeTimers();
+    try {
+      const sleep = vi.fn(async () => {});
+      const scripted = createScriptedWebListenerFactory();
+      const { controller, run } = startWebAutoReplyMonitor({
+        monitorWebChannelFn: monitorWebChannel as never,
+        listenerFactory: scripted.listenerFactory,
+        sleep,
+        accountId: "work",
+      });
+
+      await vi.waitFor(
+        () => {
+          expect(scripted.getListenerCount()).toBe(1);
+        },
+        { timeout: 250, interval: 2 },
+      );
+      expect(deliveryQueueMocks.drainPendingDeliveries).toHaveBeenCalledWith(
+        expect.objectContaining({
+          drainKey: "whatsapp:work",
+          logLabel: "WhatsApp reconnect drain",
+        }),
+      );
+
+      deliveryQueueMocks.drainPendingDeliveries.mockClear();
+      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.waitFor(() => {
+        expect(deliveryQueueMocks.drainPendingDeliveries).toHaveBeenCalledTimes(1);
+      });
+
+      const periodicCall = deliveryQueueMocks.drainPendingDeliveries.mock.calls.at(-1)?.[0] as
+        | DrainPendingDeliveriesCall
+        | undefined;
+      expect(periodicCall).toBeDefined();
+      if (!periodicCall) {
+        throw new Error("Expected WhatsApp periodic drain call");
+      }
+      expect(periodicCall.drainKey).toBe("whatsapp:work");
+      expect(periodicCall.logLabel).toBe("WhatsApp periodic drain");
+      expect(
+        periodicCall.selectEntry({
+          channel: "whatsapp",
+          accountId: "work",
+        }),
+      ).toEqual({ match: true, bypassBackoff: false });
+      expect(
+        periodicCall.selectEntry({
+          channel: "whatsapp",
+          accountId: "default",
+        }),
+      ).toEqual({ match: false, bypassBackoff: false });
+      expect(
+        periodicCall.selectEntry({
+          channel: "telegram",
+          accountId: "work",
+        }),
+      ).toEqual({ match: false, bypassBackoff: false });
+
+      controller.abort();
+      scripted.resolveClose(0, { status: 499, isLoggedOut: false, error: "aborted" });
+      await Promise.resolve();
+      await run;
+
+      deliveryQueueMocks.drainPendingDeliveries.mockClear();
+      await vi.advanceTimersByTimeAsync(30_000);
+      expect(deliveryQueueMocks.drainPendingDeliveries).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("treats status 440 as non-retryable and stops without retrying", async () => {
     const sleep = vi.fn(async () => {});
     const scripted = createScriptedWebListenerFactory();
@@ -271,7 +395,9 @@ describe("web auto-reply connection", () => {
 
     const completedQuickly = await Promise.race([
       run.then(() => true),
-      new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 60)),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(false), 60);
+      }),
     ]);
 
     if (!completedQuickly) {
@@ -845,6 +971,35 @@ describe("web auto-reply connection", () => {
     expect(capture.getLastOptions()?.debounceMs).toBe(250);
   });
 
+  it("normalizes legacy flat listener messages and rejects partial nested input", async () => {
+    const capture = createWebListenerFactoryCapture();
+    const { reply } = createWebInboundDeliverySpies();
+
+    await monitorWebChannel(false, capture.listenerFactory as never, false, async () => ({
+      text: "ok",
+    }));
+    const onMessage = requireOnMessage(capture.getOnMessage());
+    const msg = createTestLegacyFlatWebInboundMessage({
+      from: "+1",
+      conversationId: "+1",
+      chatId: "+1",
+      to: "+2",
+      reply,
+    });
+
+    expect(capture.getLastOptions()?.shouldDebounce?.(msg)).toBe(true);
+    await onMessage(msg);
+
+    expect(reply).toHaveBeenCalledWith("ok", undefined);
+    await expect(
+      onMessage({
+        ...msg,
+        id: "partial-msg",
+        payload: { body: "partial nested" },
+      } as unknown as WebInboundMessageInput),
+    ).rejects.toThrow(/legacy flat or canonical nested/);
+  });
+
   it("processes inbound messages without batching and preserves timestamps", async () => {
     await withEnvAsync({ TZ: "Europe/Vienna" }, async () => {
       const originalMax = process.getMaxListeners();
@@ -855,9 +1010,7 @@ describe("web auto-reply connection", () => {
       });
 
       try {
-        const sendMedia = vi.fn();
-        const reply = vi.fn().mockResolvedValue(createAcceptedWhatsAppSendResult("text", "r1"));
-        const sendComposing = vi.fn();
+        const { sendMedia, reply, sendComposing } = createWebInboundDeliverySpies();
         const resolver = vi.fn().mockResolvedValue({ text: "ok" });
 
         const capture = createWebListenerFactoryCapture();
@@ -905,11 +1058,15 @@ describe("web auto-reply connection", () => {
         const firstPattern = escapeRegExp(firstTimestamp);
         const secondPattern = escapeRegExp(secondTimestamp);
         expect(firstArgs.Body).toMatch(
-          new RegExp(`\\[WhatsApp \\+1 (\\+\\d+[smhd] )?${firstPattern}\\] \\[openclaw\\] first`),
+          new RegExp(
+            `\\[WhatsApp \\+1 (\\+\\d+[smhd] )?${firstPattern}\\] \\+1: \\[openclaw\\] first`,
+          ),
         );
         expect(firstArgs.Body).not.toContain("second");
         expect(secondArgs.Body).toMatch(
-          new RegExp(`\\[WhatsApp \\+1 (\\+\\d+[smhd] )?${secondPattern}\\] \\[openclaw\\] second`),
+          new RegExp(
+            `\\[WhatsApp \\+1 (\\+\\d+[smhd] )?${secondPattern}\\] \\+1: \\[openclaw\\] second`,
+          ),
         );
         expect(secondArgs.Body).not.toContain("first");
         expect(process.getMaxListeners?.()).toBeGreaterThanOrEqual(50);
@@ -974,19 +1131,27 @@ describe("web auto-reply connection", () => {
     await monitorWebChannel(false, capture.listenerFactory as never, false, resolver as never);
     const capturedOnMessage = requireOnMessage(capture.getOnMessage());
 
-    await capturedOnMessage({
-      body: "hello",
-      from: "+1",
-      conversationId: "+1",
-      to: "+2",
-      accountId: "default",
-      chatType: "direct",
-      chatId: "+1",
-      id: "msg1",
-      sendComposing: vi.fn(),
-      reply: vi.fn(),
-      sendMedia: vi.fn(),
-    });
+    await capturedOnMessage(
+      createTestWebInboundMessage({
+        event: {
+          id: "msg1",
+        },
+        payload: {
+          body: "hello",
+        },
+        platform: {
+          chatJid: "+1",
+          recipientJid: "+2",
+          sendComposing: vi.fn(),
+          reply: vi.fn(),
+          sendMedia: vi.fn(),
+        },
+        from: "+1",
+        conversationId: "+1",
+        accountId: "default",
+        chatType: "direct",
+      }),
+    );
 
     const content = await fs.readFile(logPath, "utf-8");
     expect(content).toMatch(/web-auto-reply/);
@@ -1005,9 +1170,7 @@ describe("web auto-reply connection", () => {
       markDispatchIdle,
       cleanup: vi.fn(),
     };
-    const reply = vi.fn().mockResolvedValue(createAcceptedWhatsAppSendResult("text", "r1"));
-    const sendComposing = vi.fn().mockResolvedValue(undefined);
-    const sendMedia = vi.fn().mockResolvedValue(createAcceptedWhatsAppSendResult("media", "m1"));
+    const { reply, sendComposing, sendMedia } = createWebInboundDeliverySpies();
 
     const replyResolver = vi.fn().mockImplementation(async (ctx, opts) => {
       void ctx;
@@ -1024,20 +1187,28 @@ describe("web auto-reply connection", () => {
     await monitorWebChannel(
       false,
       async ({ onMessage }) => {
-        await onMessage({
-          id: "m1",
-          from: "+1000",
-          conversationId: "+1000",
-          to: "+2000",
-          body: "hello",
-          timestamp: Date.now(),
-          chatType: "direct",
-          chatId: "direct:+1000",
-          accountId: "default",
-          sendComposing,
-          reply,
-          sendMedia,
-        });
+        await onMessage(
+          createTestWebInboundMessage({
+            event: {
+              id: "m1",
+              timestamp: Date.now(),
+            },
+            payload: {
+              body: "hello",
+            },
+            platform: {
+              chatJid: "direct:+1000",
+              recipientJid: "+2000",
+              sendComposing,
+              reply,
+              sendMedia,
+            },
+            from: "+1000",
+            conversationId: "+1000",
+            chatType: "direct",
+            accountId: "default",
+          }),
+        );
         return createMockWebListener();
       },
       false,
@@ -1049,3 +1220,17 @@ describe("web auto-reply connection", () => {
     expect(markDispatchIdle).toHaveBeenCalled();
   });
 });
+
+function toLintErrorObject(value: unknown, fallbackMessage: string): Error {
+  if (value instanceof Error) {
+    return value;
+  }
+  if (typeof value === "string") {
+    return new Error(value);
+  }
+  const error = new Error(fallbackMessage, { cause: value });
+  if ((typeof value === "object" && value !== null) || typeof value === "function") {
+    Object.assign(error, value);
+  }
+  return error;
+}

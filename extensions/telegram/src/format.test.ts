@@ -1,9 +1,11 @@
+// Telegram tests cover format plugin behavior.
 import { describe, expect, it } from "vitest";
 import {
   markdownToTelegramChunks,
   markdownToTelegramHtml,
   renderTelegramHtmlText,
   splitTelegramHtmlChunks,
+  telegramHtmlToPlainTextFallback,
 } from "./format.js";
 
 describe("markdownToTelegramHtml", () => {
@@ -53,6 +55,13 @@ describe("markdownToTelegramHtml", () => {
     ).toBe(input);
   });
 
+  it("preserves Telegram expandable blockquote HTML", () => {
+    const input = "<blockquote expandable>hidden details</blockquote>";
+
+    expect(markdownToTelegramHtml(input)).toBe(input);
+    expect(renderTelegramHtmlText(input, { textMode: "html" })).toBe(input);
+  });
+
   it("does not promote Telegram HTML tags inside code", () => {
     expect(markdownToTelegramHtml("`<b>literal</b>`")).toBe(
       "<code>&lt;b&gt;literal&lt;/b&gt;</code>",
@@ -64,9 +73,21 @@ describe("markdownToTelegramHtml", () => {
 
   it("keeps unsupported Telegram HTML variants escaped", () => {
     expect(markdownToTelegramHtml('<b class="x">bad</b>')).toBe('&lt;b class="x"&gt;bad&lt;/b&gt;');
+    expect(markdownToTelegramHtml('<blockquote cite="x">bad</blockquote>')).toBe(
+      '&lt;blockquote cite="x"&gt;bad&lt;/blockquote&gt;',
+    );
     expect(renderTelegramHtmlText('<b class="x">bad</b>', { textMode: "html" })).toBe(
       '&lt;b class="x"&gt;bad&lt;/b&gt;',
     );
+  });
+
+  it("normalizes raw code language HTML without leaking tags", () => {
+    const commandBlock = '<code class="language-text">/queue followup debounce:0\n</code>';
+
+    expect(markdownToTelegramHtml(commandBlock)).toBe("<code>/queue followup debounce:0\n</code>");
+    expect(
+      markdownToTelegramHtml('<pre><code class="language-python">print(1)\n</code></pre>'),
+    ).toBe('<pre><code class="language-python">print(1)\n</code></pre>');
   });
 
   it("renders blockquotes as native Telegram blockquote tags", () => {
@@ -95,9 +116,9 @@ describe("markdownToTelegramHtml", () => {
     expect(res.match(/<blockquote>/g)).toHaveLength(2);
   });
 
-  it("renders fenced code blocks", () => {
-    const res = markdownToTelegramHtml("```js\nconst x = 1;\n```");
-    expect(res).toBe("<pre><code>const x = 1;\n</code></pre>");
+  it("renders fenced code block languages for Telegram native copy buttons", () => {
+    const res = markdownToTelegramHtml('```bash\necho "hello"\n```');
+    expect(res).toBe('<pre><code class="language-bash">echo "hello"\n</code></pre>');
   });
 
   it("properly nests overlapping bold and autolink (#4071)", () => {
@@ -227,6 +248,28 @@ describe("markdownToTelegramHtml", () => {
     const chunks = splitTelegramHtmlChunks(`&${"A".repeat(5000)}`, 4000);
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.every((chunk) => chunk.length <= 4000)).toBe(true);
+  });
+
+  it("derives readable plain text from Telegram HTML fallback markup", () => {
+    const html = [
+      'Created: <a href="https://example.com/a?x=1&amp;y=2">Task &amp; One</a>',
+      "<code>file.md</code>",
+      "<br>",
+      '<a href="https://example.com/same">https://example.com/same</a>',
+      "<b>done</b>",
+    ].join(" ");
+
+    expect(telegramHtmlToPlainTextFallback(html)).toBe(
+      "Created: Task & One (https://example.com/a?x=1&y=2) file.md \n https://example.com/same done",
+    );
+  });
+
+  it("preserves escaped angle-bracket text in Telegram HTML fallback links", () => {
+    expect(
+      telegramHtmlToPlainTextFallback(
+        '<a href="https://example.com/task?id=1&amp;kind=bug">Task &lt;id&gt;</a>',
+      ),
+    ).toBe("Task <id> (https://example.com/task?id=1&kind=bug)");
   });
 
   it("fails loudly when tag overhead leaves no room for text", () => {

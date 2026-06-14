@@ -1,11 +1,20 @@
+// Rtt Harness script supports OpenClaw repository automation.
 import { execFile, spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
+import {
+  QA_EVIDENCE_FILENAME,
+  validateQaEvidenceSummaryJson,
+  type QaEvidenceSummaryJson,
+  type QaEvidenceTiming,
+} from "../../extensions/qa-lab/src/evidence-summary.ts";
 
 const execFileAsync = promisify(execFile);
 
 export type RttProviderMode = "mock-openai" | "live-frontier";
+export type RttCredentialSource = "env" | "convex";
+export type RttCredentialRole = "maintainer" | "ci";
 
 type RttResult = {
   package: {
@@ -41,28 +50,6 @@ type RttResult = {
   };
 };
 
-type TelegramQaSummary = {
-  scenarios?: Array<{
-    id?: string;
-    rttMs?: number;
-    status?: string;
-    samples?: Array<{
-      index?: number;
-      status?: string;
-      rttMs?: number;
-    }>;
-    stats?: {
-      total?: number;
-      passed?: number;
-      failed?: number;
-      avgMs?: number;
-      p50Ms?: number;
-      p95Ms?: number;
-      maxMs?: number;
-    };
-  }>;
-};
-
 const OPENCLAW_PACKAGE_SPEC_RE =
   /^openclaw@(main|alpha|beta|latest|[0-9]{4}\.[1-9][0-9]*\.[1-9][0-9]*(-[1-9][0-9]*|-(alpha|beta)\.[1-9][0-9]*)?)$/u;
 
@@ -71,6 +58,58 @@ const REQUIRED_TELEGRAM_ENV = [
   "OPENCLAW_QA_TELEGRAM_DRIVER_BOT_TOKEN",
   "OPENCLAW_QA_TELEGRAM_SUT_BOT_TOKEN",
 ] as const;
+
+export function parseRttCredentialSource(value: string): RttCredentialSource {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "env" || normalized === "convex") {
+    return normalized;
+  }
+  throw new Error(`--credential-source must be env or convex; got: ${value}`);
+}
+
+export function parseRttCredentialRole(value: string): RttCredentialRole {
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "maintainer" || normalized === "ci") {
+    return normalized;
+  }
+  throw new Error(`--credential-role must be maintainer or ci; got: ${value}`);
+}
+
+function resolveRttCredentialSource(
+  env: NodeJS.ProcessEnv,
+  credentialSource?: RttCredentialSource,
+): RttCredentialSource {
+  if (credentialSource) {
+    return credentialSource;
+  }
+  const rawSource =
+    env.OPENCLAW_NPM_TELEGRAM_CREDENTIAL_SOURCE ?? env.OPENCLAW_QA_CREDENTIAL_SOURCE;
+  if (rawSource?.trim()) {
+    return parseRttCredentialSource(rawSource);
+  }
+  if (
+    env.CI &&
+    env.OPENCLAW_QA_CONVEX_SITE_URL?.trim() &&
+    (env.OPENCLAW_QA_CONVEX_SECRET_CI?.trim() || env.OPENCLAW_QA_CONVEX_SECRET_MAINTAINER?.trim())
+  ) {
+    return "convex";
+  }
+  return "env";
+}
+
+function resolveRttCredentialRole(
+  env: NodeJS.ProcessEnv,
+  credentialRole?: RttCredentialRole,
+): RttCredentialRole {
+  if (credentialRole) {
+    return credentialRole;
+  }
+  const rawRole = env.OPENCLAW_NPM_TELEGRAM_CREDENTIAL_ROLE ?? env.OPENCLAW_QA_CREDENTIAL_ROLE;
+  if (rawRole?.trim()) {
+    return parseRttCredentialRole(rawRole);
+  }
+  return env.CI ? "ci" : "maintainer";
+}
 
 export function validateOpenClawPackageSpec(spec: string) {
   if (!OPENCLAW_PACKAGE_SPEC_RE.test(spec)) {
@@ -91,32 +130,41 @@ export function buildRunId(params: { now: Date; spec: string; index?: number }) 
   return `${stamp}-${safeRunLabel(params.spec)}${suffix}`;
 }
 
-export function extractRtt(summary: TelegramQaSummary) {
-  const scenarios = summary.scenarios ?? [];
-  const mention = scenarios.find((scenario) => scenario.id === "telegram-mentioned-message-reply");
-  const warmSamples = mention?.samples
-    ?.filter((sample) => sample.status === "pass" && sample.rttMs !== undefined)
-    .toSorted((left, right) => (left.index ?? 0) - (right.index ?? 0))
-    .flatMap((sample) => (sample.rttMs === undefined ? [] : [sample.rttMs]));
+export function extractRtt(summary: QaEvidenceSummaryJson) {
+  const entries = summary.entries ?? [];
+  const findEntry = (id: string) => entries.find((entry) => entry.test?.id === id);
+  const canary = findEntry("telegram-canary")?.result?.timing;
+  const mention = findEntry("telegram-mentioned-message-reply")?.result?.timing;
   const rtt: RttResult["rtt"] = {
-    canaryMs: scenarios.find((scenario) => scenario.id === "telegram-canary")?.rttMs,
-    mentionReplyMs: mention?.stats?.p50Ms ?? mention?.rttMs,
+    canaryMs: canary?.rttMs,
+    mentionReplyMs: mention?.p50Ms ?? mention?.rttMs,
   };
-  if (warmSamples?.length) {
-    rtt.warmSamples = warmSamples;
-  }
-  if (mention?.stats) {
-    rtt.avgMs = mention.stats.avgMs;
-    rtt.p50Ms = mention.stats.p50Ms;
-    rtt.p95Ms = mention.stats.p95Ms;
-    rtt.maxMs = mention.stats.maxMs;
-    rtt.failedSamples = mention.stats.failed;
-  }
+  appendRttTiming(rtt, mention);
   return rtt;
+}
+
+function appendRttTiming(rtt: RttResult["rtt"], timing: QaEvidenceTiming | undefined) {
+  if (timing?.avgMs !== undefined) {
+    rtt.avgMs = timing.avgMs;
+  }
+  if (timing?.p50Ms !== undefined) {
+    rtt.p50Ms = timing.p50Ms;
+  }
+  if (timing?.p95Ms !== undefined) {
+    rtt.p95Ms = timing.p95Ms;
+  }
+  if (timing?.maxMs !== undefined) {
+    rtt.maxMs = timing.maxMs;
+  }
+  if (timing?.failedSamples !== undefined) {
+    rtt.failedSamples = timing.failedSamples;
+  }
 }
 
 export function createHarnessEnv(params: {
   baseEnv: NodeJS.ProcessEnv;
+  credentialRole?: RttCredentialRole;
+  credentialSource?: RttCredentialSource;
   packageTgz?: string;
   providerMode: RttProviderMode;
   scenarios: string[];
@@ -127,12 +175,21 @@ export function createHarnessEnv(params: {
   sampleTimeoutMs: number;
   timeoutMs: number;
 }) {
+  const packageSourceSpec = params.packageTgz ?? params.spec;
   return {
     ...params.baseEnv,
     OPENCLAW_NPM_TELEGRAM_PACKAGE_SPEC: params.spec,
     ...(params.packageTgz ? { OPENCLAW_NPM_TELEGRAM_PACKAGE_TGZ: params.packageTgz } : {}),
     OPENCLAW_NPM_TELEGRAM_PACKAGE_LABEL: `${params.spec} (${params.version})`,
     OPENCLAW_NPM_TELEGRAM_PROVIDER_MODE: params.providerMode,
+    OPENCLAW_QA_PACKAGE_SOURCE: packageSourceSpec,
+    OPENCLAW_QA_PACKAGE_SOURCE_KIND: params.packageTgz ? "packed-tarball" : "npm-package",
+    ...(params.credentialSource
+      ? { OPENCLAW_NPM_TELEGRAM_CREDENTIAL_SOURCE: params.credentialSource }
+      : {}),
+    ...(params.credentialRole
+      ? { OPENCLAW_NPM_TELEGRAM_CREDENTIAL_ROLE: params.credentialRole }
+      : {}),
     OPENCLAW_NPM_TELEGRAM_SCENARIOS: params.scenarios.join(","),
     OPENCLAW_NPM_TELEGRAM_OUTPUT_DIR: params.rawOutputDir,
     OPENCLAW_NPM_TELEGRAM_FAST: params.baseEnv.OPENCLAW_NPM_TELEGRAM_FAST ?? "1",
@@ -143,7 +200,32 @@ export function createHarnessEnv(params: {
   };
 }
 
-export function assertRequiredEnv(env: NodeJS.ProcessEnv) {
+export function assertRequiredEnv(
+  env: NodeJS.ProcessEnv,
+  options: {
+    credentialRole?: RttCredentialRole;
+    credentialSource?: RttCredentialSource;
+  } = {},
+) {
+  const credentialSource = resolveRttCredentialSource(env, options.credentialSource);
+  if (credentialSource === "convex") {
+    const missing: string[] = [];
+    const credentialRole = resolveRttCredentialRole(env, options.credentialRole);
+    if (!env.OPENCLAW_QA_CONVEX_SITE_URL?.trim()) {
+      missing.push("OPENCLAW_QA_CONVEX_SITE_URL");
+    }
+    if (credentialRole === "ci" && !env.OPENCLAW_QA_CONVEX_SECRET_CI?.trim()) {
+      missing.push("OPENCLAW_QA_CONVEX_SECRET_CI");
+    }
+    if (credentialRole === "maintainer" && !env.OPENCLAW_QA_CONVEX_SECRET_MAINTAINER?.trim()) {
+      missing.push("OPENCLAW_QA_CONVEX_SECRET_MAINTAINER");
+    }
+    if (missing.length > 0) {
+      throw new Error(`Missing Convex Telegram QA credential env: ${missing.join(", ")}`);
+    }
+    return;
+  }
+
   const missing = REQUIRED_TELEGRAM_ENV.filter((key) => !env[key]?.trim());
   if (missing.length > 0) {
     throw new Error(`Missing Telegram QA env: ${missing.join(", ")}`);
@@ -195,7 +277,11 @@ export async function resolveMainVersion(harnessRoot: string) {
 }
 
 export async function readTelegramSummary(summaryPath: string) {
-  return JSON.parse(await fs.readFile(summaryPath, "utf8")) as TelegramQaSummary;
+  return validateQaEvidenceSummaryJson(JSON.parse(await fs.readFile(summaryPath, "utf8")));
+}
+
+export async function resolveTelegramSummaryPath(outputDir: string) {
+  return path.join(outputDir, QA_EVIDENCE_FILENAME);
 }
 
 export async function writeJson(pathname: string, value: unknown) {
@@ -222,18 +308,38 @@ export async function runHarness(params: { env: NodeJS.ProcessEnv; harnessRoot: 
   return exitCode ?? 1;
 }
 
+function rttSummaryFailed(summary: QaEvidenceSummaryJson, requestedScenarios: string[]) {
+  const entries = summary.entries ?? [];
+  const requiredScenarioIds = ["telegram-canary", ...requestedScenarios];
+  for (const scenarioId of requiredScenarioIds) {
+    const entry = entries.find((candidate) => candidate.test?.id === scenarioId);
+    if (!entry || entry.result?.status !== "pass") {
+      return true;
+    }
+    const timing = entry.result.timing;
+    const rttMs =
+      scenarioId === "telegram-mentioned-message-reply"
+        ? (timing?.p50Ms ?? timing?.rttMs)
+        : timing?.rttMs;
+    if (typeof rttMs !== "number" || !Number.isFinite(rttMs)) {
+      return true;
+    }
+  }
+  return entries.some((entry) => entry.result?.status !== "pass");
+}
+
 export function buildRttResult(params: {
   artifacts: RttResult["artifacts"];
   finishedAt: Date;
   providerMode: RttProviderMode;
-  rawSummary: TelegramQaSummary;
+  rawSummary: QaEvidenceSummaryJson;
   runId: string;
   scenarios: string[];
   spec: string;
   startedAt: Date;
   version: string;
 }): RttResult {
-  const failed = (params.rawSummary.scenarios ?? []).some((scenario) => scenario.status === "fail");
+  const failed = rttSummaryFailed(params.rawSummary, params.scenarios);
   return {
     package: {
       spec: params.spec,
