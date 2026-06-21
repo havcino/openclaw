@@ -188,6 +188,11 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-release-amd64
           build-args: |
             OPENCLAW_EXTENSIONS=diagnostics-otel,codex
+            OPENCLAW_HOME_VOLUME=openclaw_home
+            OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
+            OPENCLAW_SANDBOX=1
+            OPENCLAW_INSTALL_DOCKER_CLI=1
+            OPENCLAW_INSTALL_BROWSER=1
           tags: ${{ steps.tags.outputs.value }}
           labels: ${{ steps.labels.outputs.value }}
           sbom: true
@@ -208,6 +213,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-release-browser-amd64
           build-args: |
             OPENCLAW_EXTENSIONS=diagnostics-otel,codex
+            OPENCLAW_HOME_VOLUME=openclaw_home
+            OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
+            OPENCLAW_SANDBOX=1
+            OPENCLAW_INSTALL_DOCKER_CLI=1
             OPENCLAW_INSTALL_BROWSER=1
           tags: ${{ steps.tags.outputs.browser }}
           labels: ${{ steps.labels.outputs.value }}
@@ -398,6 +407,11 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-release-arm64
           build-args: |
             OPENCLAW_EXTENSIONS=diagnostics-otel,codex
+            OPENCLAW_HOME_VOLUME=openclaw_home
+            OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
+            OPENCLAW_SANDBOX=1
+            OPENCLAW_INSTALL_DOCKER_CLI=1
+            OPENCLAW_INSTALL_BROWSER=1
           tags: ${{ steps.tags.outputs.value }}
           labels: ${{ steps.labels.outputs.value }}
           sbom: true
@@ -418,6 +432,10 @@ jobs:
           cache-to: type=gha,mode=max,scope=docker-release-browser-arm64
           build-args: |
             OPENCLAW_EXTENSIONS=diagnostics-otel,codex
+            OPENCLAW_HOME_VOLUME=openclaw_home
+            OPENCLAW_DOCKER_APT_PACKAGES=git curl jq
+            OPENCLAW_SANDBOX=1
+            OPENCLAW_INSTALL_DOCKER_CLI=1
             OPENCLAW_INSTALL_BROWSER=1
           tags: ${{ steps.tags.outputs.browser }}
           labels: ${{ steps.labels.outputs.value }}
